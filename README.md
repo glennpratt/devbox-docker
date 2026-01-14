@@ -203,9 +203,14 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v ${{ github.workspace }}:/project \
+            -v devbox-nix-cache:/root/.cache/nix \
             ghcr.io/OWNER/devbox-docker-builder:latest \
             --name ghcr.io/${{ github.repository }} \
             --tag ${{ github.sha }}
+
+> [!CAUTION]
+> **Do not mount a host directory over `/nix` in CI.**
+> The builder image contains pre-installed tools (like `skopeo` and `nix`) in its `/nix` store. Mounting a host directory over `/nix` will hide these tools and cause the build to fail. For faster builds, cache the download directory `/root/.cache/nix` instead.
       
       - run: docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
 ```

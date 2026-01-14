@@ -40,7 +40,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ runner.temp }}/nix-store
             ${{ runner.temp }}/nix-cache
           key: nix-store-example-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
           restore-keys: |
@@ -51,7 +50,6 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v ${{ github.workspace }}/example:/project \
-            -v ${{ runner.temp }}/nix-store:/nix \
             -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
             ${{ env.BUILDER_IMAGE }} \
             --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} \
