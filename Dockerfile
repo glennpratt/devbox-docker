@@ -10,6 +10,9 @@ RUN nix-env --install --file '<nixpkgs>' --attr nix cacert -I nixpkgs=channel:ni
     nix-env -iA nixpkgs.skopeo && \
     nix-collect-garbage --delete-old -d
 
+# Ensure Nix profile binaries are in PATH
+ENV PATH="/root/.nix-profile/bin:${PATH}"
+
 # Copy the flake template and entrypoint
 COPY flake.nix /builder/
 COPY scripts/entrypoint.sh /builder/entrypoint.sh

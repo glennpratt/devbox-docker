@@ -88,8 +88,8 @@ else
 fi
 
 echo "==> Loading image as ${FULL_IMAGE}..."
-eval "$(devbox global shellenv)" 2>/dev/null || true
 skopeo copy --insecure-policy docker-archive:./result "docker-daemon:${FULL_IMAGE}"
+
 
 echo "==> Successfully built: ${FULL_IMAGE}"
 
