@@ -1,0 +1,18 @@
+# Build outputs
+result
+result.tar.gz
+
+# Nix
+flake.lock
+
+# Devbox generated files
+.devbox/
+
+# Backup
+.gitbak/
+
+# Docker
+docker/
+
+# OS
+.DS_Store

@@ -1,0 +1,60 @@
+name: Test Build
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-builder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build builder image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: devbox-nix-builder:test
+          platforms: linux/amd64
+
+      - name: Set up Nix store directories
+        run: |
+          mkdir -p ${{ runner.temp }}/nix-store
+          mkdir -p ${{ runner.temp }}/nix-cache
+
+      - name: Restore Nix store cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/nix-store
+            ${{ runner.temp }}/nix-cache
+          key: nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          restore-keys: |
+            nix-store-test-
+
+      - name: Test building the example
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}/example:/project \
+            -v ${{ runner.temp }}/nix-store:/nix \
+            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            devbox-nix-builder:test \
+            --name test-app --tag test
+
+      - name: Verify built image
+        run: |
+          docker images test-app:test
+          docker run --rm test-app:test yq --version
+          docker run --rm test-app:test curl --version | head -1
+
+      - name: Show image size
+        run: |
+          docker images test-app:test --format "Image: {{.Repository}}:{{.Tag}} Size: {{.Size}}"

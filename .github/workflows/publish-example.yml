@@ -1,0 +1,74 @@
+name: Publish Example Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'example/**'
+      - 'flake.nix'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BUILDER_IMAGE: ghcr.io/${{ github.repository }}-builder:latest
+  EXAMPLE_IMAGE: ${{ github.repository }}-example
+
+jobs:
+  build-example:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Nix store directories
+        run: |
+          mkdir -p ${{ runner.temp }}/nix-store
+          mkdir -p ${{ runner.temp }}/nix-cache
+
+      - name: Restore Nix store cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/nix-store
+            ${{ runner.temp }}/nix-cache
+          key: nix-store-example-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          restore-keys: |
+            nix-store-example-
+
+      - name: Build example using the builder
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}/example:/project \
+            -v ${{ runner.temp }}/nix-store:/nix \
+            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            ${{ env.BUILDER_IMAGE }} \
+            --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} \
+            --tag latest
+
+      - name: Tag with SHA
+        run: |
+          docker tag \
+            ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest \
+            ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:${{ github.sha }}
+
+      - name: Push example image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:${{ github.sha }}
+
+      - name: Verify example image
+        run: |
+          docker run --rm ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest yq --version
+          docker run --rm ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest curl --version | head -1
