@@ -165,13 +165,19 @@ docker volume rm devbox-nix-store devbox-nix-cache
 
 ## CI/CD
 
-This repository includes GitHub Actions workflows:
+This repository uses a consolidated pipeline in `.github/workflows/push.yml` that orchestrates the building process:
 
-| Workflow | Trigger | Purpose |
+| Trigger | Sequence | Purpose |
 |----------|---------|---------|
-| `test.yml` | Pull requests | Tests the full build flow without publishing |
-| `publish-builder.yml` | Push to main | Publishes the builder image to GHCR |
-| `publish-example.yml` | Push to main | Uses the builder to publish the example (dogfooding) |
+| **Pull Request** | `Test Build` | Verifies the build flow without publishing. |
+| **Push to Main** | `Builder` → `Example` | Sequential build and publish. Passes the builder's image SHA to the example job to ensure consistency. |
+
+### Unified Orchestrator
+
+The `push.yml` workflow calls reusable components:
+- `test.yml`: Runs tests without pushing.
+- `publish-builder.yml`: Builds and pushes the builder image, outputting the image SHA.
+- `publish-example.yml`: Builds and pushes the example image using the specific builder SHA.
 
 ### Using in Your Own Project
 

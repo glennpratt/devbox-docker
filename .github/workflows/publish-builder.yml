@@ -1,12 +1,11 @@
 name: Publish Builder Image
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'Dockerfile'
-      - 'flake.nix'
-      - 'scripts/**'
+  workflow_call:
+    outputs:
+      image_tag:
+        description: "The image tag (SHA) that was pushed"
+        value: ${{ jobs.build-and-push.outputs.image_tag }}
   workflow_dispatch:
 
 env:
@@ -16,6 +15,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.sha_short }}
     permissions:
       contents: read
       packages: write
@@ -23,6 +24,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,6 +46,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.vars.outputs.sha_short }}
             type=sha,prefix=
             type=ref,event=branch
 

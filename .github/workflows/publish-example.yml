@@ -1,18 +1,17 @@
 name: Publish Example Image
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'example/**'
-      - 'flake.nix'
-      - 'scripts/**'
-      - '.github/workflows/publish-example.yml'
+  workflow_call:
+    inputs:
+      builder_tag:
+        description: "The tag of the builder image to use"
+        type: string
+        default: "latest"
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  BUILDER_IMAGE: ghcr.io/${{ github.repository }}-builder:latest
+  BUILDER_IMAGE: ghcr.io/${{ github.repository }}-builder:${{ inputs.builder_tag || 'latest' }}
   EXAMPLE_IMAGE: ${{ github.repository }}-example
 
 jobs:

@@ -1,0 +1,30 @@
+name: Pipeline Orchestrator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/test.yml
+
+  build-builder:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/publish-builder.yml
+    permissions:
+      contents: read
+      packages: write
+
+  build-example:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-builder
+    uses: ./.github/workflows/publish-example.yml
+    with:
+      builder_tag: ${{ needs.build-builder.outputs.image_tag }}
+    permissions:
+      contents: read
+      packages: write
