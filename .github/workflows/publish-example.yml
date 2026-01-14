@@ -26,11 +26,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug Inputs
-        run: |
-          echo "Input builder_tag: ${{ inputs.builder_tag }}"
-          echo "Env BUILDER_IMAGE: $BUILDER_IMAGE"
-
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:

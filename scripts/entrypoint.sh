@@ -73,6 +73,9 @@ done
 # Detect system architecture from devbox flake
 NIX_SYSTEM="x86_64-linux"
 
+# Fix for git ownership issues in Nix cache (common in GHA with UID mismatches)
+git config --global --add safe.directory '*'
+
 echo "==> Installing devbox packages..."
 devbox install
 
