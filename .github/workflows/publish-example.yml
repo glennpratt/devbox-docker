@@ -6,6 +6,8 @@ on:
     paths:
       - 'example/**'
       - 'flake.nix'
+      - 'scripts/**'
+      - '.github/workflows/publish-example.yml'
   workflow_dispatch:
 
 env:
