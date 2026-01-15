@@ -15,6 +15,9 @@ jobs:
   test-gha-compat:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/test-gha-container.yml
+    permissions:
+      contents: read
+      packages: write
 
   build-builder:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
