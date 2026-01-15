@@ -10,13 +10,69 @@
     { self, devbox-gen, ... }:
     let
       system = builtins.head (builtins.attrNames devbox-gen.devShells);
-      # Reuse devbox's nixpkgs to ensure all packages use the same versions
-      pkgs = devbox-gen.inputs.nixpkgs.legacyPackages.${system};
+
+      # Read devbox.lock to find the most common nixpkgs revision
+      # This ensures pkgs.* packages use the same nixpkgs as devbox packages
+      devboxLock = builtins.fromJSON (builtins.readFile /project/devbox.lock);
+
+      # Extract nixpkgs revisions from resolved package URLs
+      # Format: "github:NixOS/nixpkgs/<rev>#<pkg>" or "github:NixOS/nixpkgs/<rev>?..."
+      extractRevision = resolved:
+        let
+          # Remove "github:NixOS/nixpkgs/" prefix
+          afterPrefix = builtins.substring 27 (builtins.stringLength resolved) resolved;
+          # Find the end of revision (# or ? or end of string)
+          hashPos = let p = builtins.match "([^#?]+).*" afterPrefix;
+                    in if p == null then afterPrefix else builtins.head p;
+        in hashPos;
+
+      # Get all resolved URLs that are from nixpkgs AND have a package selector (#)
+      # This filters out base nixpkgs entries that don't reference specific packages
+      resolvedUrls = builtins.filter
+        (url: builtins.substring 0 27 url == "github:NixOS/nixpkgs/" &&
+              builtins.match ".*#.*" url != null)
+        (builtins.map
+          (pkg: pkg.resolved or "")
+          (builtins.attrValues devboxLock.packages));
+
+      # Extract revisions and count occurrences
+      revisions = builtins.map extractRevision resolvedUrls;
+
+      # Count occurrences of each revision
+      countRevision = rev: builtins.length (builtins.filter (r: r == rev) revisions);
+
+      # Find the most common revision (simple approach: pick first one with highest count)
+      uniqueRevisions = builtins.attrNames (builtins.listToAttrs
+        (builtins.map (r: { name = r; value = true; }) revisions));
+
+      mostCommonRev =
+        if builtins.length uniqueRevisions == 0
+        then null
+        else builtins.head (builtins.sort
+          (a: b: countRevision a > countRevision b)
+          uniqueRevisions);
+
+      # Fetch the most common nixpkgs, or fall back to devbox-gen's nixpkgs
+      nixpkgsSource =
+        if mostCommonRev == null
+        then devbox-gen.inputs.nixpkgs
+        else builtins.fetchTarball {
+          url = "https://github.com/NixOS/nixpkgs/archive/${mostCommonRev}.tar.gz";
+        };
+
+      # Use the detected nixpkgs for all packages
+      pkgs =
+        if mostCommonRev == null
+        then devbox-gen.inputs.nixpkgs.legacyPackages.${system}
+        else (import nixpkgsSource { inherit system; });
 
       # Get the dynamic linker path for this system
       dynamicLinker = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";
 
       # Base packages for all images
+      # Note: We get curl/yq-go from the same pkgs to ensure all dependencies share
+      # the same nixpkgs revision. Using devbox-gen.devShells.buildInputs would pull
+      # in transitive dependencies from the wrong nixpkgs revision.
       baseContents = [
         pkgs.bashInteractive
         pkgs.coreutils
@@ -24,8 +80,10 @@
         pkgs.dockerTools.caCertificates
         pkgs.dockerTools.fakeNss
         pkgs.dockerTools.usrBinEnv
-        # Use devShell inputs from the generated devbox flake
-      ] ++ (devbox-gen.devShells.${system}.default.buildInputs or [ ]);
+        # Add devbox packages directly from the unified pkgs
+        pkgs.curl
+        pkgs.yq-go
+      ];
 
       # Additional packages for GitHub Actions compatibility
       ghaContents = [

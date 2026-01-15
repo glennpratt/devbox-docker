@@ -106,9 +106,10 @@ else
 fi
 
 # Build command
-# Build command
+# Build command - using --impure to allow reading devbox.lock for nixpkgs detection
 nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
   --extra-experimental-features 'nix-command flakes fetch-closure' \
+  --impure \
   --print-build-logs
 
 # Determine the full image reference
