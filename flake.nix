@@ -24,6 +24,8 @@
           pkgs.dockerTools.usrBinEnv
           # glibc for dynamic linker compatibility (GitHub Actions, etc.)
           pkgs.glibc
+          # C++ standard library (libstdc++) for Node.js and other tools
+          pkgs.stdenv.cc.lib
           # Use devShell inputs from the generated devbox flake
         ] ++ (devbox-gen.devShells.${system}.default.buildInputs or []);
     in
