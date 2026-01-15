@@ -96,7 +96,6 @@ echo "==> Installing devbox packages..."
 devbox install
 
 echo "==> Extracting environment variables from devbox init_hook..."
-echo "==> Extracting environment variables from devbox init_hook..."
 # Optimized "one-pass" extraction:
 # Prepend an environment dump to the init_hook to capture the "before" state,
 # then capture the "after" state from the final `devbox run printenv` output.
