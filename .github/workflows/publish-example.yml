@@ -43,9 +43,9 @@ jobs:
         with:
           path: |
             ${{ runner.temp }}/nix-cache
-          key: nix-store-example-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          key: v2-nix-store-example-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
           restore-keys: |
-            nix-store-example-
+            v2-nix-store-example-
 
       - name: Build example using the builder
         run: |
@@ -61,6 +61,11 @@ jobs:
         run: |
           docker run --rm ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest yq --version
           docker run --rm ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest curl --version | head -1
+
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache
 
       - name: Push example image
         run: |
