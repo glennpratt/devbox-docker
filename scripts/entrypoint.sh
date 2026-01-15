@@ -6,6 +6,7 @@ IMAGE_NAME="devbox-app"
 IMAGE_TAG="latest"
 PUSH=""
 REGISTRY=""
+GITHUB_ACTIONS=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -26,6 +27,10 @@ while [[ $# -gt 0 ]]; do
       REGISTRY="$2"
       shift 2
       ;;
+    --github-actions)
+      GITHUB_ACTIONS="true"
+      shift
+      ;;
     --help|-h)
       cat <<EOF
 Build a layered Docker image from a devbox project.
@@ -37,11 +42,12 @@ Usage:
     devbox-nix-builder [OPTIONS]
 
 Options:
-  --name NAME      Name for the output image (default: devbox-app)
-  --tag TAG        Tag for the output image (default: latest)
-  --push           Push to registry after building
-  --registry URL   Registry to push to (e.g., ghcr.io/user)
-  --help           Show this help message
+  --name NAME         Name for the output image (default: devbox-app)
+  --tag TAG           Tag for the output image (default: latest)
+  --push              Push to registry after building
+  --registry URL      Registry to push to (e.g., ghcr.io/user)
+  --github-actions    Build with GitHub Actions compatibility (adds ~15MB)
+  --help              Show this help message
 
 Examples:
   # Build with default name
@@ -80,7 +86,16 @@ echo "==> Installing devbox packages..."
 devbox install
 
 echo "==> Building Docker image with Nix..."
-nix build /builder#packages.${NIX_SYSTEM}.dockerImage \
+# Determine which image output to build
+if [[ -n "$GITHUB_ACTIONS" ]]; then
+  echo "    Building with GitHub Actions compatibility..."
+  IMAGE_OUTPUT="ghaCompatImage"
+else
+  IMAGE_OUTPUT="dockerImage"
+fi
+
+# Build command
+nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
   --extra-experimental-features 'nix-command flakes fetch-closure'
 
 # Determine the full image reference

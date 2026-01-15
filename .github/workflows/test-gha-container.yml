@@ -41,7 +41,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v ${{ github.workspace }}/example:/project \
             devbox-nix-builder:test \
-            --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }}
+            --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }} --github-actions
 
       - name: Push test image
         run: docker push ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
