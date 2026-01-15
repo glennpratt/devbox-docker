@@ -2,16 +2,22 @@
   description = "Build a layered docker image using packages from a generated devbox flake";
 
   inputs = {
-    # Use the same nixpkgs as devbox to avoid duplicate dependencies
+    # The devbox-generated flake (provides buildInputs and default nixpkgs)
     devbox-gen.url = "path:/project/.devbox/gen/flake";
+
+    # nixpkgs can be overridden via --override-input to match devbox packages
+    # Default follows devbox-gen's nixpkgs, but override for package alignment
+    nixpkgs.follows = "devbox-gen/nixpkgs";
   };
 
   outputs =
-    { self, devbox-gen, ... }:
+    { self, devbox-gen, nixpkgs, ... }:
     let
       system = builtins.head (builtins.attrNames devbox-gen.devShells);
-      # Reuse devbox's nixpkgs to ensure all packages use the same versions
-      pkgs = devbox-gen.inputs.nixpkgs.legacyPackages.${system};
+
+      # Use the (potentially overridden) nixpkgs for all base packages
+      # This ensures glibc, bashInteractive, etc. match the devbox package deps
+      pkgs = nixpkgs.legacyPackages.${system};
 
       # Get the dynamic linker path for this system
       dynamicLinker = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";

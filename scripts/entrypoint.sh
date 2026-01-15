@@ -59,11 +59,10 @@ Examples:
   # Build and push to registry
   docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v \$(pwd):/project devbox-nix-builder --name myapp --push --registry ghcr.io/myuser
 
-For faster builds, mount Nix store volumes:
+For faster builds, mount a cache volume:
   docker run --rm \\
     -v /var/run/docker.sock:/var/run/docker.sock \\
     -v \$(pwd):/project \\
-    -v devbox-nix-store:/nix \\
     -v devbox-nix-cache:/root/.cache/nix \\
     devbox-nix-builder --name myapp
 EOF
@@ -105,10 +104,35 @@ else
   IMAGE_OUTPUT="dockerImage"
 fi
 
-# Build command
-# Build command
+# Detect the most common nixpkgs revision from devbox.lock
+# This minimizes package version bloat by matching common packages that don't
+# require precise versions to devbox package dependencies. This can be aided
+# by the user choosing to use NixOS channel versions instead of explicit package
+# versions in devbox.json. e.g. "github:NixOS/nixpkgs/nixos-25.05#bashInteractive"
+# instead of "bashInteractive@5.2.16"
+NIXPKGS_OVERRIDE=()
+if [[ -f devbox.lock ]]; then
+  # Extract nixpkgs revisions from resolved URLs that have a # (package selector)
+  # Format: "github:NixOS/nixpkgs/<rev>?...#<pkg>" or "github:NixOS/nixpkgs/<rev>#<pkg>"
+  MOST_COMMON_REV=$(jq -r '
+    .packages | to_entries[]
+    | select(.value.resolved != null)
+    | .value.resolved
+    | select(contains("#"))
+    | capture("github:NixOS/nixpkgs/(?<rev>[^?#]+)")
+    | .rev
+  ' devbox.lock 2>/dev/null | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
+
+  if [[ -n "$MOST_COMMON_REV" ]]; then
+    echo "    Detected nixpkgs revision: $MOST_COMMON_REV"
+    NIXPKGS_OVERRIDE=(--override-input nixpkgs "github:NixOS/nixpkgs/$MOST_COMMON_REV")
+  fi
+fi
+
+# Build command - pure evaluation with optional nixpkgs override
 nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
   --extra-experimental-features 'nix-command flakes fetch-closure' \
+  "${NIXPKGS_OVERRIDE[@]}" \
   --print-build-logs
 
 # Determine the full image reference
