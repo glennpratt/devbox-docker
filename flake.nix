@@ -88,6 +88,13 @@
               ''
                 mkdir -p lib64
                 ln -sf ${pkgs.nix-ld}/libexec/nix-ld lib64/ld-linux-x86-64.so.2
+
+                # Add default SSH config to support /root/.ssh/config and known_hosts
+                # Remove the default symlink from openssh package if it exists
+                rm -f etc/ssh/ssh_config
+                mkdir -p etc/ssh
+                echo "Include /root/.ssh/config" > etc/ssh/ssh_config
+                echo "UserKnownHostsFile /root/.ssh/known_hosts /etc/ssh/ssh_known_hosts" >> etc/ssh/ssh_config
               ''
             else
               "";
