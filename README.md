@@ -80,10 +80,9 @@ docker run --rm \
 ```
 
 **What this adds** (~15MB):
-- `/lib64/ld-linux-x86-64.so.2` - Dynamic linker for GHA's Node.js binary
-- `libstdc++.so.6` - C++ standard library
-- `tar` and `gzip` - Required by `actions/checkout`  
-- `LD_LIBRARY_PATH=/lib64` - Library search path
+- `nix-ld` - Shim dynamic linker at `/lib64/ld-linux-x86-64.so.2`
+- `libstdc++.so.6` & `glibc` - Dependencies for GHA binaries
+- `tar` and `gzip` - Required by `actions/checkout`
 
 **Why it's needed**: GitHub Actions mounts its own Node.js runtime (`/__e/node20/bin/node`) to run JavaScript-based actions like `actions/checkout@v4`. This binary expects glibc and standard libraries at FHS-compliant paths, which Nix images don't provide by default.
 
