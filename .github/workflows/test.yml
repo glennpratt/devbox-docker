@@ -53,6 +53,11 @@ jobs:
           docker run --rm test-app:test yq --version
           docker run --rm test-app:test curl --version | head -1
 
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache
+
       - name: Show image size
         run: |
           docker images test-app:test --format "Image: {{.Repository}}:{{.Tag}} Size: {{.Size}}"
