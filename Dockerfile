@@ -5,9 +5,9 @@ RUN echo filter-syscalls = false >> /etc/nix/nix.conf && \
     echo experimental-features = nix-command fetch-closure flakes >> /etc/nix/nix.conf && \
     echo download-buffer-size = 4294967296 >> /etc/nix/nix.conf
 
-# Install additional tools: updated nix, skopeo for image copying
+# Install additional tools: updated nix, skopeo for image copying, jq for JSON parsing
 RUN nix-env --install --file '<nixpkgs>' --attr nix cacert -I nixpkgs=channel:nixpkgs-unstable && \
-    nix-env -iA nixpkgs.skopeo && \
+    nix-env -iA nixpkgs.skopeo nixpkgs.jq && \
     nix-collect-garbage --delete-old -d
 
 # Ensure Nix profile binaries are in PATH
