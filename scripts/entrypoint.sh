@@ -91,6 +91,12 @@ if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
   export NIX_CONFIG="substituters = file://${NIX_BINARY_CACHE_DIR} ${CURRENT_SUBSTITUTERS}
 require-sigs = false"
   mkdir -p "${NIX_BINARY_CACHE_DIR}"
+  echo "DEBUG: NIX_CONFIG set to:"
+  echo "$NIX_CONFIG"
+  echo "DEBUG: Checking cache dir ${NIX_BINARY_CACHE_DIR}:"
+  ls -F "${NIX_BINARY_CACHE_DIR}" || echo "Cache dir not accessible"
+  echo "DEBUG: Verifying Nix config from tool:"
+  nix show-config --extra-experimental-features 'nix-command flakes' | grep substituters
 fi
 
 echo "==> Installing devbox packages..."
