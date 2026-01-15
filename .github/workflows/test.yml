@@ -154,7 +154,7 @@ jobs:
           echo "==> Testing ssh..."
           ssh -V
           echo "==> Testing ssh-agent..."
-          which ssh-agent
+          command -v ssh-agent
           echo "==> Checking /lib64 symlink..."
           ls -la /lib64/ || echo "No /lib64"
           echo "==> SUCCESS: Container is GHA-compatible!"
