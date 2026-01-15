@@ -40,11 +40,11 @@
 
           # Create /lib64 symlink for glibc dynamic linker compatibility
           # This allows external binaries (e.g., GitHub Actions' Node.js) to run
-          fakeRootCommands = ''
-            mkdir -p ./lib64
-            ln -sf ${dynamicLinker} ./lib64/ld-linux-x86-64.so.2
+          # Using extraCommands instead of fakeRootCommands to avoid needing proot
+          extraCommands = ''
+            mkdir -p lib64
+            ln -sf ${dynamicLinker} lib64/ld-linux-x86-64.so.2
           '';
-          enableFakechroot = true;
 
           config = {
             Cmd = [ "/bin/bash" "-l" ];
