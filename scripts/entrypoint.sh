@@ -95,6 +95,68 @@ fi
 echo "==> Installing devbox packages..."
 devbox install
 
+echo "==> Extracting environment variables from devbox init_hook..."
+# Optimized "one-pass" extraction:
+# Prepend an environment dump to the init_hook to capture the "before" state,
+# then capture the "after" state from the final `devbox run printenv` output.
+ENV_VARS=""
+if [[ -f devbox.json ]] && jq -e '.shell.init_hook' devbox.json >/dev/null 2>&1; then
+  # Save original config
+  cp devbox.json devbox.json.orig
+
+  # Inject an environment dump at the start of the init_hook
+  # Handling both string and array formats for init_hook
+  jq '.shell.init_hook |= if type == "string" then "printenv > /tmp/env_before; " + . else ["printenv > /tmp/env_before"] + . end' devbox.json.orig > devbox.json
+
+  echo "    Running devbox printenv (single pass)..."
+  # Capture final env (after hook) while the hook itself dumps the before env
+  ENV_AFTER_HOOK=$(devbox run --pure printenv 2>/dev/null | sort)
+
+  if [[ -f /tmp/env_before ]]; then
+    ENV_BEFORE_HOOK=$(sort /tmp/env_before)
+    rm -f /tmp/env_before
+  else
+    # Fallback if the injection failed for some reason
+    ENV_BEFORE_HOOK=$(sort <(printenv))
+  fi
+
+  # Restore original config
+  cp devbox.json.orig devbox.json
+  rm -f devbox.json.orig
+
+  # Find variables that are new or changed (excluding PATH)
+  # Filter out internal devbox/nix noise
+  ENV_VARS=$(comm -13 <(echo "$ENV_BEFORE_HOOK") <(echo "$ENV_AFTER_HOOK") | \
+    grep -v '^PATH=' | \
+    grep -v '^__DEVBOX_' | \
+    grep -v '^DEVBOX_.*_HASH=' || true)
+
+  # Handle PATH specially - extract the new path components that were added
+  PATH_WITH=$(echo "$ENV_AFTER_HOOK" | grep '^PATH=' | cut -d= -f2-)
+  PATH_WITHOUT=$(echo "$ENV_BEFORE_HOOK" | grep '^PATH=' | cut -d= -f2-)
+
+  if [[ "$PATH_WITH" != "$PATH_WITHOUT" ]]; then
+    # Find path components in PATH_WITH that aren't in PATH_WITHOUT
+    NEW_PATH_COMPONENTS=$(comm -23 \
+      <(echo "$PATH_WITH" | tr ':' '\n' | sort) \
+      <(echo "$PATH_WITHOUT" | tr ':' '\n' | sort) | \
+      tr '\n' ':' | sed 's/:$//')
+
+    if [[ -n "$NEW_PATH_COMPONENTS" ]]; then
+      ENV_VARS="${ENV_VARS}
+PATH_ADDITIONS=${NEW_PATH_COMPONENTS}"
+    fi
+  fi
+
+  # Trim empty lines and whitespace
+  ENV_VARS=$(echo "$ENV_VARS" | grep -v '^$' | sed 's/[[:space:]]*$//' || true)
+fi
+
+if [[ -n "$ENV_VARS" ]]; then
+  echo "    Found environment variables from init_hook:"
+  echo "$ENV_VARS" | sed 's/^/      /'
+fi
+
 echo "==> Building Docker image with Nix..."
 # Determine which image output to build
 if [[ -n "$GITHUB_ACTIONS" ]]; then
@@ -129,10 +191,19 @@ if [[ -f devbox.lock ]]; then
   fi
 fi
 
-# Build command - pure evaluation with optional nixpkgs override
+# Write extracted environment variables to JSON file for flake to read
+# Format: ["NAME=value", "NAME2=value2"]
+if [[ -n "$ENV_VARS" ]]; then
+  echo "$ENV_VARS" | jq -R -s 'split("\n") | map(select(length > 0))' > /project/.devbox-env-vars.json
+else
+  echo "[]" > /project/.devbox-env-vars.json
+fi
+
+# Build command - requires --impure to read the env vars file
 nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
   --extra-experimental-features 'nix-command flakes fetch-closure' \
   "${NIXPKGS_OVERRIDE[@]}" \
+  --impure \
   --print-build-logs
 
 # Determine the full image reference
