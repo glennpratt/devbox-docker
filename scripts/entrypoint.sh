@@ -83,13 +83,27 @@ git config --global --add safe.directory '*'
 
 # Add binary cache if configured
 if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
+  mkdir -p "${NIX_BINARY_CACHE_DIR}"
   echo "==> Using binary cache at ${NIX_BINARY_CACHE_DIR}..."
+
+  TRUSTED_KEYS=""
+  if [[ -f /root/.cache/nix/cache-pub.key ]]; then
+    echo "    Found public key for cache verification."
+    TRUSTED_KEYS="trusted-public-keys = $(cat /root/.cache/nix/cache-pub.key) cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+  fi
+
   # Configure Nix to use the local cache globally (affects devbox install and nix build)
   # keeping upstream as fallback
-  CURRENT_SUBSTITUTERS=$(nix show-config --extra-experimental-features 'nix-command flakes' | grep '^substituters =' | cut -d'=' -f2 | xargs)
+  CURRENT_SUBSTITUTERS=$(nix config show --extra-experimental-features 'nix-command flakes' | grep '^substituters =' | cut -d'=' -f2 | xargs)
   export NIX_CONFIG="substituters = file://${NIX_BINARY_CACHE_DIR} ${CURRENT_SUBSTITUTERS}
-require-sigs = false"
-  mkdir -p "${NIX_BINARY_CACHE_DIR}"
+require-sigs = false
+${TRUSTED_KEYS}"
+fi
+
+if [[ "${VERBOSE:-0}" == "1" ]]; then
+    echo "==> Environment Check"
+    echo "    NIX_CONFIG: $NIX_CONFIG"
+    export DEVBOX_DEBUG=1
 fi
 
 echo "==> Installing devbox packages..."
@@ -222,9 +236,26 @@ echo "==> Successfully built: ${FULL_IMAGE}"
 
 # Copy to cache if configured
 if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
-  echo "==> Copying build closure to cache..."
-  nix copy --to "file://${NIX_BINARY_CACHE_DIR}" /builder#packages.${NIX_SYSTEM}.dockerImage
-  nix copy --to "file://${NIX_BINARY_CACHE_DIR}" /builder#packages.${NIX_SYSTEM}.cache
+    echo "==> Copying build closure to cache (verbose)..."
+    PUSH_URI="file://${NIX_BINARY_CACHE_DIR}"
+    if [[ -f "/root/.cache/nix/cache-priv.key" ]]; then
+        echo "    Signing cache with secret key."
+        PUSH_URI="${PUSH_URI}?secret-key=/root/.cache/nix/cache-priv.key"
+    else
+        echo "    Warning: No secret key found, pushing without signing."
+        # Fallback to no-check-sigs for existing behavior if key is missing
+        NIX_CONFIG="${NIX_CONFIG:-}
+        substituters = https://cache.nixos.org file://${NIX_BINARY_CACHE_DIR}
+        "
+    fi
+
+    nix_copy=(nix copy)
+    if [[ "${VERBOSE:-0}" == "1" ]]; then
+        nix_copy+=(-v)
+    fi
+
+    "${nix_copy[@]}" --to "$PUSH_URI" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}
+    "${nix_copy[@]}" --to "$PUSH_URI" /builder#packages.${NIX_SYSTEM}.cache
 fi
 
 # Push if requested

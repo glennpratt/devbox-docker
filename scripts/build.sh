@@ -21,4 +21,5 @@ docker run --rm -it \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PROJECT_DIR":/project \
   --workdir /project \
+  -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/binary-cache \
   "$IMAGE_NAME" --name devbox-example --tag latest

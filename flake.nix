@@ -147,10 +147,12 @@
         # Image with GitHub Actions compatibility
         ghaCompatImage = buildImage { includeGHA = true; };
 
-        # Manifest of all packages to be cached
+        # Manifest of all packages to be cached (captures full closure)
         cache = pkgs.symlinkJoin {
           name = "devbox-cache";
-          paths = baseContents ++ ghaContents;
+          paths = baseContents ++ ghaContents ++
+                  (devbox-gen.devShells.${system}.default.buildInputs or []) ++
+                  (devbox-gen.devShells.${system}.default.nativeBuildInputs or []);
         };
       };
 
