@@ -1,0 +1,13 @@
+{
+  "packages": [
+    "nixfmt-rfc-style@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to devbox-docker development environment!'"
+    ],
+    "scripts": {
+      "fmt": "nixfmt flake.nix"
+    }
+  }
+}

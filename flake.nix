@@ -6,7 +6,8 @@
     devbox-gen.url = "path:/project/.devbox/gen/flake";
   };
 
-  outputs = { self, devbox-gen, ... }:
+  outputs =
+    { self, devbox-gen, ... }:
     let
       system = builtins.head (builtins.attrNames devbox-gen.devShells);
       # Reuse devbox's nixpkgs to ensure all packages use the same versions
@@ -17,52 +18,84 @@
 
       # Base packages for all images
       baseContents = [
-          pkgs.bashInteractive
-          pkgs.coreutils
-          pkgs.dockerTools.binSh
-          pkgs.dockerTools.caCertificates
-          pkgs.dockerTools.fakeNss
-          pkgs.dockerTools.usrBinEnv
-          # Use devShell inputs from the generated devbox flake
-        ] ++ (devbox-gen.devShells.${system}.default.buildInputs or []);
+        pkgs.bashInteractive
+        pkgs.coreutils
+        pkgs.dockerTools.binSh
+        pkgs.dockerTools.caCertificates
+        pkgs.dockerTools.fakeNss
+        pkgs.dockerTools.usrBinEnv
+        # Use devShell inputs from the generated devbox flake
+      ] ++ (devbox-gen.devShells.${system}.default.buildInputs or [ ]);
 
       # Additional packages for GitHub Actions compatibility
       ghaContents = [
-          # glibc for dynamic linker compatibility
-          pkgs.glibc
-          # C++ standard library (libstdc++) for Node.js
-          pkgs.stdenv.cc.cc.lib
-          # tar and gzip for actions/checkout
-          pkgs.gnutar
-          pkgs.gzip
-        ];
+        # nix-ld: shim dynamic linker for executing FHS binaries (like GHA's node)
+        pkgs.nix-ld
+        # Dependencies that GHA's node binary needs to find via nix-ld
+        pkgs.glibc
+        pkgs.stdenv.cc.cc.lib
+        pkgs.zlib
+        pkgs.openssl
+        # Tools for actions/checkout
+        pkgs.gnutar
+        pkgs.gzip
+      ];
 
       # Build image with specified contents and optional GHA support
-      buildImage = { includeGHA }: pkgs.dockerTools.buildLayeredImage {
-        name = "devbox-example";
-        tag = "latest";
+      buildImage =
+        { includeGHA }:
+        let
+          # Only add GHA contents if requested
+          finalContents = baseContents ++ (if includeGHA then ghaContents else [ ]);
 
-        # No base image - pure Nix for minimal size
-        contents = baseContents ++ (if includeGHA then ghaContents else []);
+          # NIX_LD_LIBRARY_PATH: libraries to be found by nix-ld for FHS binaries
+          nixLdLibraryPath = pkgs.lib.makeLibraryPath [
+            pkgs.glibc
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
+            pkgs.openssl
+          ];
 
-        # Create /lib64 symlink for glibc dynamic linker compatibility (GHA only)
-        extraCommands = if includeGHA then ''
-          mkdir -p lib64
-          ln -sf ${dynamicLinker} lib64/ld-linux-x86-64.so.2
-        '' else "";
+          # Create /lib64/ld-linux-x86-64.so.2 symlink pointing to nix-ld
+          # This intercepts execution of FHS binaries (using standard linker path)
+          # and routes them through nix-ld, which sets up the environment correctly.
+          finalExtraCommands =
+            if includeGHA then
+              ''
+                mkdir -p lib64
+                ln -sf ${pkgs.nix-ld}/libexec/nix-ld lib64/ld-linux-x86-64.so.2
+              ''
+            else
+              "";
 
-        config = {
-          Cmd = [ "/bin/bash" "-l" ];
-          Env = [
+          # Only set special Env if requested
+          finalEnv = [
             "USER=root"
             "PATH=/bin:/usr/bin"
             "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
           ] ++ (if includeGHA then [
-            # Make dynamic linker search /lib64 for libraries
-            "LD_LIBRARY_PATH=/lib64"
+            "NIX_LD=${dynamicLinker}"
+            "NIX_LD_LIBRARY_PATH=${nixLdLibraryPath}"
           ] else []);
+        in
+        pkgs.dockerTools.buildLayeredImage {
+          name = "devbox-example";
+          tag = "latest";
+
+          # No base image - pure Nix for minimal size
+          contents = finalContents;
+
+          # Create /lib64 symlink for glibc dynamic linker compatibility (GHA only)
+          extraCommands = finalExtraCommands;
+
+          config = {
+            Cmd = [
+              "/bin/bash"
+              "-l"
+            ];
+            Env = finalEnv;
+          };
         };
-      };
     in
     {
       packages.${system} = {

@@ -1,0 +1,57 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "github:NixOS/nixpkgs/nixpkgs-unstable": {
+      "last_modified": "2025-12-22T13:40:18Z",
+      "resolved": "github:NixOS/nixpkgs/3a7affa77a5a539afa1c7859e2c31abdb1aeadf3?lastModified=1766410818"
+    },
+    "nixfmt-rfc-style@latest": {
+      "last_modified": "2025-07-13T22:45:35Z",
+      "resolved": "github:NixOS/nixpkgs/a421ac6595024edcfbb1ef950a3712b89161c359#nixfmt-rfc-style",
+      "source": "devbox-search",
+      "version": "2025-04-04",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5nfmxhbdngdzww7f5dm8p6vrnzf4jh6s-nixfmt-unstable-2025-04-04",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5nfmxhbdngdzww7f5dm8p6vrnzf4jh6s-nixfmt-unstable-2025-04-04"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/vwys9ysdw5ibjwkzarw5x2pwvb5gggz7-nixfmt-unstable-2025-04-04",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/vwys9ysdw5ibjwkzarw5x2pwvb5gggz7-nixfmt-unstable-2025-04-04"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5gg0f69yfi251qkr7zsgxan89yc0xlwa-nixfmt-unstable-2025-04-04",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5gg0f69yfi251qkr7zsgxan89yc0xlwa-nixfmt-unstable-2025-04-04"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/vc0a3hf84h5i5v03jm21x6xrkm5arvh8-nixfmt-unstable-2025-04-04",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/vc0a3hf84h5i5v03jm21x6xrkm5arvh8-nixfmt-unstable-2025-04-04"
+        }
+      }
+    }
+  }
+}
