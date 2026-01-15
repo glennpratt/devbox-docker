@@ -66,6 +66,26 @@ The build produces a layered Docker image with:
 - **41 separate layers** (for the example project with curl + yq)
 - **~137MB total size** (pure Nix, no base image)
 - Proper layer caching—changing one package only invalidates that layer
+- **Environment Passthrough**: Environment variables exported in `devbox.json` `init_hook` are automatically captured and injected into the image.
+
+## Environment Passthrough
+
+Any environment variable you `export` in your `devbox.json`'s `init_hook` will be automatically extracted and baked into the Docker image's environment.
+
+```json
+{
+  "shell": {
+    "init_hook": [
+      "export GOPRIVATE=github.com/myorg/*",
+      "export PATH=\"$HOME/go/bin:$PATH\""
+    ]
+  }
+}
+```
+
+- **evaluated**: Variables are captured after shell expansion (e.g. `$HOME` becomes `/root`).
+- **PATH merging**: Additions to `PATH` are prependend to the standard `/bin:/usr/bin` path.
+- **Clean**: Internal Devbox and Nix variables are automatically filtered out.
 
 ## GitHub Actions Compatibility
 
