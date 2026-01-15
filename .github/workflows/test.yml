@@ -43,6 +43,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v ${{ github.workspace }}/example:/project \
             -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
             devbox-nix-builder:test \
             --name test-app --tag test
 
