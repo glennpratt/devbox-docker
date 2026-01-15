@@ -33,9 +33,9 @@ jobs:
         with:
           path: |
             ${{ runner.temp }}/nix-cache
-          key: nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          key: v2-nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
           restore-keys: |
-            nix-store-test-
+            v2-nix-store-test-
 
       - name: Test building the example
         run: |
@@ -43,6 +43,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v ${{ github.workspace }}/example:/project \
             -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
             devbox-nix-builder:test \
             --name test-app --tag test
 
@@ -51,6 +52,11 @@ jobs:
           docker images test-app:test
           docker run --rm test-app:test yq --version
           docker run --rm test-app:test curl --version | head -1
+
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache
 
       - name: Show image size
         run: |
