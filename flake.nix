@@ -39,6 +39,8 @@
         # Tools for actions/checkout
         pkgs.gnutar
         pkgs.gzip
+        # SSH for actions that use deploy keys or ssh-agent
+        pkgs.openssh
       ];
 
       # Build image with specified contents and optional GHA support
