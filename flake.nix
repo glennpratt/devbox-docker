@@ -52,6 +52,8 @@
               "USER=root"
               "PATH=/bin:/usr/bin"
               "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+              # Make dynamic linker search /lib64 for libraries (for GHA compatibility)
+              "LD_LIBRARY_PATH=/lib64"
             ];
           };
         };
