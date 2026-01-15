@@ -236,17 +236,13 @@ echo "==> Successfully built: ${FULL_IMAGE}"
 
 # Copy to cache if configured
 if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
-    echo "==> Copying build closure to cache (verbose)..."
+    echo "==> Copying build closure to cache..."
     PUSH_URI="file://${NIX_BINARY_CACHE_DIR}"
     if [[ -f "/root/.cache/nix/cache-priv.key" ]]; then
         echo "    Signing cache with secret key."
         PUSH_URI="${PUSH_URI}?secret-key=/root/.cache/nix/cache-priv.key"
     else
         echo "    Warning: No secret key found, pushing without signing."
-        # Fallback to no-check-sigs for existing behavior if key is missing
-        NIX_CONFIG="${NIX_CONFIG:-}
-        substituters = https://cache.nixos.org file://${NIX_BINARY_CACHE_DIR}
-        "
     fi
 
     nix_copy=(nix copy)
