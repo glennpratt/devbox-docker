@@ -37,11 +37,12 @@ docker run --rm \
 ### Options
 
 ```
---name NAME      Name for the output image (default: devbox-app)
---tag TAG        Tag for the output image (default: latest)
---push           Push to registry after building
---registry URL   Registry to push to (e.g., ghcr.io/user)
---help           Show help message
+--name NAME           Name for the output image (default: devbox-app)
+--tag TAG             Tag for the output image (default: latest)
+--push                Push to registry after building
+--registry URL        Registry to push to (e.g., ghcr.io/user)
+--github-actions      Build with GitHub Actions compatibility (adds ~15MB)
+--help                Show help message
 ```
 
 ## How It Works
@@ -66,6 +67,37 @@ The build produces a layered Docker image with:
 - **41 separate layers** (for the example project with curl + yq)
 - **~137MB total size** (pure Nix, no base image)
 - Proper layer caching—changing one package only invalidates that layer
+
+## GitHub Actions Compatibility
+
+By default, images are built minimal. To use the image as a `container:` in GitHub Actions workflows, add the `--github-actions` flag:
+
+```bash
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd):/project \
+  devbox-nix-builder:latest --name myapp --github-actions
+```
+
+**What this adds** (~15MB):
+- `/lib64/ld-linux-x86-64.so.2` - Dynamic linker for GHA's Node.js binary
+- `libstdc++.so.6` - C++ standard library
+- `tar` and `gzip` - Required by `actions/checkout`  
+- `LD_LIBRARY_PATH=/lib64` - Library search path
+
+**Why it's needed**: GitHub Actions mounts its own Node.js runtime (`/__e/node20/bin/node`) to run JavaScript-based actions like `actions/checkout@v4`. This binary expects glibc and standard libraries at FHS-compliant paths, which Nix images don't provide by default.
+
+**Example workflow**:
+```yaml
+jobs:
+  build-in-container:
+    runs-on: ubuntu-latest
+    container:
+      image: myapp:latest  # Built with --github-actions
+    steps:
+      - uses: actions/checkout@v4  # Works!
+      - run: your-devbox-command
+```
 
 ## Building the Builder Image
 
