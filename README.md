@@ -84,7 +84,7 @@ Any environment variable you `export` in your `devbox.json`'s `init_hook` will b
 ```
 
 - **evaluated**: Variables are captured after shell expansion (e.g. `$HOME` becomes `/root`).
-- **PATH merging**: Additions to `PATH` are prependend to the standard `/bin:/usr/bin` path.
+- **PATH merging**: Additions to `PATH` are prepended to the standard `/bin:/usr/bin` path.
 - **Clean**: Internal Devbox and Nix variables are automatically filtered out.
 
 ## GitHub Actions Compatibility
