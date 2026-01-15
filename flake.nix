@@ -2,21 +2,30 @@
   description = "Build a layered docker image using packages from a generated devbox flake";
 
   inputs = {
-    # Use the same nixpkgs as devbox to avoid duplicate dependencies
+    # The devbox-generated flake (provides buildInputs and default nixpkgs)
     devbox-gen.url = "path:/project/.devbox/gen/flake";
+
+    # nixpkgs can be overridden via --override-input to match devbox packages
+    # Default follows devbox-gen's nixpkgs, but override for package alignment
+    nixpkgs.follows = "devbox-gen/nixpkgs";
   };
 
   outputs =
-    { self, devbox-gen, ... }:
+    { self, devbox-gen, nixpkgs, ... }:
     let
       system = builtins.head (builtins.attrNames devbox-gen.devShells);
-      # Reuse devbox's nixpkgs to ensure all packages use the same versions
-      pkgs = devbox-gen.inputs.nixpkgs.legacyPackages.${system};
+
+      # Use the (potentially overridden) nixpkgs for all base packages
+      # This ensures glibc, bashInteractive, etc. match the devbox package deps
+      pkgs = nixpkgs.legacyPackages.${system};
 
       # Get the dynamic linker path for this system
       dynamicLinker = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";
 
       # Base packages for all images
+      # Note: We get curl/yq-go from the same pkgs to ensure all dependencies share
+      # the same nixpkgs revision. Using devbox-gen.devShells.buildInputs would pull
+      # in transitive dependencies from the wrong nixpkgs revision.
       baseContents = [
         pkgs.bashInteractive
         pkgs.coreutils
@@ -24,8 +33,10 @@
         pkgs.dockerTools.caCertificates
         pkgs.dockerTools.fakeNss
         pkgs.dockerTools.usrBinEnv
-        # Use devShell inputs from the generated devbox flake
-      ] ++ (devbox-gen.devShells.${system}.default.buildInputs or [ ]);
+        # Add devbox packages directly from the unified pkgs
+        pkgs.curl
+        pkgs.yq-go
+      ];
 
       # Additional packages for GitHub Actions compatibility
       ghaContents = [

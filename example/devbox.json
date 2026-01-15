@@ -1,7 +1,7 @@
 {
-  "$schema":  "https://raw.githubusercontent.com/jetify-com/devbox/0.16.0/.schema/devbox.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.16.0/.schema/devbox.schema.json",
   "packages": [
-    "curl@latest",
-    "yq-go@latest"
+    "github:NixOS/nixpkgs/nixos-25.11#curl",
+    "github:NixOS/nixpkgs/nixos-25.11#yq-go"
   ]
 }

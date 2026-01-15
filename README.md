@@ -23,13 +23,12 @@ docker run --rm \
 docker run --rm myapp:v1.0
 ```
 
-### With Nix Store Caching (Faster Rebuilds)
+### With Download Caching (Faster Rebuilds)
 
 ```bash
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/project \
-  -v devbox-nix-store:/nix \
   -v devbox-nix-cache:/root/.cache/nix \
   devbox-nix-builder:latest --name myapp --tag v1.0
 ```
@@ -165,26 +164,28 @@ The `example/` directory contains a minimal devbox project:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Volume Strategy
+## Caching Strategy
 
-For faster rebuilds, use Docker volumes to cache the Nix store:
+For faster rebuilds, cache the Nix download directory:
 
 ```bash
-# Create volumes once
-docker volume create devbox-nix-store
+# Create cache volume
 docker volume create devbox-nix-cache
 
-# Use them in builds
+# Use in builds
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/project \
-  -v devbox-nix-store:/nix \
   -v devbox-nix-cache:/root/.cache/nix \
   devbox-nix-builder:latest
 
 # Cleanup (to force fresh builds)
-docker volume rm devbox-nix-store devbox-nix-cache
+docker volume rm devbox-nix-cache
 ```
+
+> [!CAUTION]
+> **Do not mount a host directory over `/nix`.**
+> The builder image contains pre-installed tools in its `/nix` store. Mounting over `/nix` will hide these tools and cause the build to fail.
 
 ## Known Limitations
 
