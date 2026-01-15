@@ -4,9 +4,9 @@ on:
   workflow_call:
     inputs:
       builder_tag:
-        description: "The tag of the builder image to use"
+        description: The tag of the builder image to use
         type: string
-        default: "latest"
+        default: latest
   workflow_dispatch:
 
 env:
@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILDER_IMAGE: ghcr.io/${{ github.repository }}-builder:${{ inputs.builder_tag || 'latest' }}
+      NIX_BINARY_CACHE_DIR: /root/.cache/nix/store
     permissions:
       contents: read
       packages: write
@@ -35,7 +36,6 @@ jobs:
 
       - name: Set up Nix store directories
         run: |
-          mkdir -p ${{ runner.temp }}/nix-store
           mkdir -p ${{ runner.temp }}/nix-cache
 
       - name: Restore Nix store cache
@@ -57,18 +57,11 @@ jobs:
             --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} \
             --tag latest
 
-      - name: Tag with SHA
-        run: |
-          docker tag \
-            ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest \
-            ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:${{ github.sha }}
-
-      - name: Push example image
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest
-          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:${{ github.sha }}
-
       - name: Verify example image
         run: |
           docker run --rm ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest yq --version
           docker run --rm ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest curl --version | head -1
+
+      - name: Push example image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest

@@ -82,6 +82,17 @@ NIX_SYSTEM="x86_64-linux"
 # Fix for git ownership issues in Nix cache (common in GHA with UID mismatches)
 git config --global --add safe.directory '*'
 
+# Add binary cache if configured
+if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
+  echo "==> Using binary cache at ${NIX_BINARY_CACHE_DIR}..."
+  # Configure Nix to use the local cache globally (affects devbox install and nix build)
+  # keeping upstream as fallback
+  CURRENT_SUBSTITUTERS=$(nix show-config --extra-experimental-features 'nix-command flakes' | grep '^substituters =' | cut -d'=' -f2 | xargs)
+  export NIX_CONFIG="substituters = file://${NIX_BINARY_CACHE_DIR} ${CURRENT_SUBSTITUTERS}
+require-sigs = false"
+  mkdir -p "${NIX_BINARY_CACHE_DIR}"
+fi
+
 echo "==> Installing devbox packages..."
 devbox install
 
@@ -95,8 +106,10 @@ else
 fi
 
 # Build command
+# Build command
 nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
-  --extra-experimental-features 'nix-command flakes fetch-closure'
+  --extra-experimental-features 'nix-command flakes fetch-closure' \
+  --print-build-logs
 
 # Determine the full image reference
 if [[ -n "$REGISTRY" ]]; then
@@ -110,6 +123,13 @@ skopeo copy --insecure-policy docker-archive:./result "docker-daemon:${FULL_IMAG
 
 
 echo "==> Successfully built: ${FULL_IMAGE}"
+
+# Copy to cache if configured
+if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
+  echo "==> Copying build closure to cache..."
+  nix copy --to "file://${NIX_BINARY_CACHE_DIR}" /builder#packages.${NIX_SYSTEM}.dockerImage
+  nix copy --to "file://${NIX_BINARY_CACHE_DIR}" /builder#packages.${NIX_SYSTEM}.cache
+fi
 
 # Push if requested
 if [[ -n "$PUSH" ]]; then
