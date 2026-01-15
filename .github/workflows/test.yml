@@ -33,9 +33,9 @@ jobs:
         with:
           path: |
             ${{ runner.temp }}/nix-cache
-          key: nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          key: v2-nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
           restore-keys: |
-            nix-store-test-
+            v2-nix-store-test-
 
       - name: Test building the example
         run: |
