@@ -6,7 +6,8 @@
     devbox-gen.url = "path:/project/.devbox/gen/flake";
   };
 
-  outputs = { self, devbox-gen, ... }:
+  outputs =
+    { self, devbox-gen, ... }:
     let
       system = builtins.head (builtins.attrNames devbox-gen.devShells);
       # Reuse devbox's nixpkgs to ensure all packages use the same versions
@@ -17,37 +18,42 @@
 
       # Base packages for all images
       baseContents = [
-          pkgs.bashInteractive
-          pkgs.coreutils
-          pkgs.dockerTools.binSh
-          pkgs.dockerTools.caCertificates
-          pkgs.dockerTools.fakeNss
-          pkgs.dockerTools.usrBinEnv
-          # Use devShell inputs from the generated devbox flake
-        ] ++ (devbox-gen.devShells.${system}.default.buildInputs or []);
+        pkgs.bashInteractive
+        pkgs.coreutils
+        pkgs.dockerTools.binSh
+        pkgs.dockerTools.caCertificates
+        pkgs.dockerTools.fakeNss
+        pkgs.dockerTools.usrBinEnv
+        # Use devShell inputs from the generated devbox flake
+      ] ++ (devbox-gen.devShells.${system}.default.buildInputs or [ ]);
 
       # Additional packages for GitHub Actions compatibility
       ghaContents = [
-          # glibc for dynamic linker compatibility
-          pkgs.glibc
-          # C++ standard library (libstdc++) for Node.js
-          pkgs.stdenv.cc.cc.lib
-          # tar and gzip for actions/checkout
-          pkgs.gnutar
-          pkgs.gzip
-        ];
+        # glibc for dynamic linker compatibility
+        pkgs.glibc
+        # C++ standard library (libstdc++) for Node.js
+        pkgs.stdenv.cc.cc.lib
+        # tar and gzip for actions/checkout
+        pkgs.gnutar
+        pkgs.gzip
+      ];
 
       # Build image with specified contents and optional GHA support
-      buildImage = { includeGHA }:
+      buildImage =
+        { includeGHA }:
         let
           # Only add GHA contents if requested
-          finalContents = baseContents ++ (if includeGHA then ghaContents else []);
+          finalContents = baseContents ++ (if includeGHA then ghaContents else [ ]);
 
           # Only create symlink if requested
-          finalExtraCommands = if includeGHA then ''
-            mkdir -p lib64
-            ln -sf ${dynamicLinker} lib64/ld-linux-x86-64.so.2
-          '' else "";
+          finalExtraCommands =
+            if includeGHA then
+              ''
+                mkdir -p lib64
+                ln -sf ${dynamicLinker} lib64/ld-linux-x86-64.so.2
+              ''
+            else
+              "";
 
           # Only set special Env if requested
           finalEnv = [
@@ -67,7 +73,10 @@
           extraCommands = finalExtraCommands;
 
           config = {
-            Cmd = [ "/bin/bash" "-l" ];
+            Cmd = [
+              "/bin/bash"
+              "-l"
+            ];
             Env = finalEnv;
           };
         };
