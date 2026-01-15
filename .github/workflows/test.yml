@@ -1,12 +1,22 @@
-name: Test Build
+name: Test and Publish
 
 on:
   workflow_call:
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  BUILDER_IMAGE: ${{ github.repository }}-builder
+  EXAMPLE_IMAGE: ${{ github.repository }}-example
+
 jobs:
-  test-builder:
+  test-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      gha_test_image: ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -14,6 +24,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set short SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build the builder image once - this is the ONLY builder build in this workflow
       - name: Build builder image
         uses: docker/build-push-action@v5
         with:
@@ -22,10 +44,12 @@ jobs:
           load: true
           tags: devbox-nix-builder:test
           platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
+      # === Local Tests ===
       - name: Set up Nix store directories
         run: |
-          mkdir -p ${{ runner.temp }}/nix-store
           mkdir -p ${{ runner.temp }}/nix-cache
 
       - name: Restore Nix store cache
@@ -53,11 +77,84 @@ jobs:
           docker run --rm test-app:test yq --version
           docker run --rm test-app:test curl --version | head -1
 
-      - name: Fix cache permissions
-        if: always()
-        run: |
-          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache
-
       - name: Show image size
         run: |
           docker images test-app:test --format "Image: {{.Repository}}:{{.Tag}} Size: {{.Size}}"
+
+      # === GHA Compatibility Test Image ===
+      - name: Build GHA-compat example image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}/example:/project \
+            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
+            devbox-nix-builder:test \
+            --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }} --github-actions
+
+      - name: Push GHA-compat test image
+        run: docker push ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
+
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache || true
+
+      # === Conditional Publish (only on main, after tests pass) ===
+      - name: Extract builder metadata
+        if: github.ref == 'refs/heads/main'
+        id: builder-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BUILDER_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.vars.outputs.sha_short }}
+            type=sha,prefix=
+            type=ref,event=branch
+
+      - name: Push builder image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          for tag in $(echo "${{ steps.builder-meta.outputs.tags }}" | tr '\n' ' '); do
+            docker tag devbox-nix-builder:test "$tag"
+            docker push "$tag"
+          done
+
+      - name: Build and push example image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}/example:/project \
+            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
+            devbox-nix-builder:test \
+            --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} --tag latest
+          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest
+
+  # Test running in the GHA-compat container
+  test-in-container:
+    needs: test-and-publish
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.test-and-publish.outputs.gha_test_image }}
+    steps:
+      # This is THE critical test - if actions/checkout works,
+      # the dynamic linker fix is working because GHA's Node.js runs
+      - name: Checkout (tests GHA Node.js compatibility)
+        uses: actions/checkout@v4
+
+      - name: Verify devbox packages work
+        run: |
+          echo "==> Testing yq..."
+          yq --version
+          echo "==> Testing curl..."
+          curl --version | head -1
+          echo "==> Testing ssh..."
+          ssh -V
+          echo "==> Testing ssh-agent..."
+          command -v ssh-agent
+          echo "==> Checking /lib64 symlink..."
+          ls -la /lib64/ || echo "No /lib64"
+          echo "==> SUCCESS: Container is GHA-compatible!"
