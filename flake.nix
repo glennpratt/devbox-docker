@@ -26,8 +26,9 @@
           pkgs.glibc
           # C++ standard library (libstdc++) for Node.js and other tools
           pkgs.stdenv.cc.cc.lib
-          # tar for actions/checkout
+          # tar and gzip for actions/checkout
           pkgs.gnutar
+          pkgs.gzip
           # Use devShell inputs from the generated devbox flake
         ] ++ (devbox-gen.devShells.${system}.default.buildInputs or []);
     in
