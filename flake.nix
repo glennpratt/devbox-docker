@@ -38,28 +38,39 @@
         ];
 
       # Build image with specified contents and optional GHA support
-      buildImage = { includeGHA }: pkgs.dockerTools.buildLayeredImage {
-        name = "devbox-example";
-        tag = "latest";
+      buildImage = { includeGHA }:
+        let
+          # Only add GHA contents if requested
+          finalContents = baseContents ++ (if includeGHA then ghaContents else []);
 
-        # No base image - pure Nix for minimal size
-        contents = baseContents ++ (if includeGHA then ghaContents else []);
+          # Only create symlink if requested
+          finalExtraCommands = if includeGHA then ''
+            mkdir -p lib64
+            ln -sf ${dynamicLinker} lib64/ld-linux-x86-64.so.2
+          '' else "";
 
-        # Create /lib64 symlink for glibc dynamic linker compatibility (GHA only)
-        extraCommands = if includeGHA then ''
-          mkdir -p lib64
-          ln -sf ${dynamicLinker} lib64/ld-linux-x86-64.so.2
-        '' else "";
-
-        config = {
-          Cmd = [ "/bin/bash" "-l" ];
-          Env = [
+          # Only set special Env if requested
+          finalEnv = [
             "USER=root"
             "PATH=/bin:/usr/bin"
             "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
           ];
+        in
+        pkgs.dockerTools.buildLayeredImage {
+          name = "devbox-example";
+          tag = "latest";
+
+          # No base image - pure Nix for minimal size
+          contents = finalContents;
+
+          # Create /lib64 symlink for glibc dynamic linker compatibility (GHA only)
+          extraCommands = finalExtraCommands;
+
+          config = {
+            Cmd = [ "/bin/bash" "-l" ];
+            Env = finalEnv;
+          };
         };
-      };
     in
     {
       packages.${system} = {
