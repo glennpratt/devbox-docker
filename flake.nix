@@ -59,6 +59,7 @@
         pkgs.zlib
         pkgs.openssl
         # Tools for actions/checkout
+        pkgs.git
         pkgs.gnutar
         pkgs.gzip
         # SSH for actions that use deploy keys or ssh-agent
