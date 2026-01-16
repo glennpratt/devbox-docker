@@ -34,9 +34,6 @@
       dynamicLinker = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";
 
       # Base packages for all images
-      # Note: We get curl/yq-go from the same pkgs to ensure all dependencies share
-      # the same nixpkgs revision. Using devbox-gen.devShells.buildInputs would pull
-      # in transitive dependencies from the wrong nixpkgs revision.
       baseContents = [
         pkgs.bashInteractive
         pkgs.coreutils
@@ -44,10 +41,11 @@
         pkgs.dockerTools.caCertificates
         pkgs.dockerTools.fakeNss
         pkgs.dockerTools.usrBinEnv
-        # Add devbox packages directly from the unified pkgs
-        pkgs.curl
-        pkgs.yq-go
-      ];
+        # Include all devbox packages from the generated flake
+        # Note: these come from the same nixpkgs as pkgs (potentially overridden)
+        # to maintain version consistency
+      ] ++ (devbox-gen.devShells.${system}.default.buildInputs or [])
+        ++ (devbox-gen.devShells.${system}.default.nativeBuildInputs or []);
 
       # Additional packages for GitHub Actions compatibility
       ghaContents = [
