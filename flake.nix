@@ -83,7 +83,9 @@
           # This intercepts execution of FHS binaries (using standard linker path)
           # and routes them through nix-ld, which sets up the environment correctly.
           finalExtraCommands =
-            if includeGHA then
+            ''
+              mkdir -p -m 1777 tmp
+            '' + (if includeGHA then
               ''
                 mkdir -p lib64
                 ln -sf ${pkgs.nix-ld}/libexec/nix-ld lib64/ld-linux-x86-64.so.2
@@ -96,7 +98,7 @@
                 echo "UserKnownHostsFile /root/.ssh/known_hosts /etc/ssh/ssh_known_hosts" >> etc/ssh/ssh_config
               ''
             else
-              "";
+              "");
 
           # Only set special Env if requested
           # Base env + user-provided envVars from init_hook + GHA-specific if needed
