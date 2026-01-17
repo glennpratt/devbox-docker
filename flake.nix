@@ -62,6 +62,8 @@
         pkgs.gzip
         # SSH for actions that use deploy keys or ssh-agent
         pkgs.openssh
+        # nice to have
+        pkgs.busybox
       ];
 
       # Build image with specified contents and optional GHA support
