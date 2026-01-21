@@ -49,8 +49,23 @@
         # Include all devbox packages from the generated flake
         # Note: these come from the same nixpkgs as pkgs (potentially overridden)
         # to maintain version consistency
-      ] ++ (devbox-gen.devShells.${system}.default.buildInputs or [])
-        ++ (devbox-gen.devShells.${system}.default.nativeBuildInputs or []);
+      ] ++ (
+        let
+          inputs =
+            (devbox-gen.devShells.${system}.default.buildInputs or [ ])
+            ++ (devbox-gen.devShells.${system}.default.nativeBuildInputs or [ ]);
+        in
+        # Include both default and bin outputs for all packages.
+        # This ensures that packages which split binaries into a 'bin' output
+        # (like jq) have their binaries symlinked into /bin.
+        builtins.concatMap (
+          pkg:
+          let
+            hasBin = builtins.elem "bin" (pkg.outputs or [ "out" ]);
+          in
+          if hasBin then [ pkg pkg.bin ] else [ pkg ]
+        ) inputs
+      );
 
       # Additional packages for GitHub Actions compatibility
       ghaContents = [

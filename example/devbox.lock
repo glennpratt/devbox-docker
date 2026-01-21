@@ -9,6 +9,10 @@
       "last_modified": "2026-01-13T16:58:14Z",
       "resolved": "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a?lastModified=1768323494#curl"
     },
+    "github:NixOS/nixpkgs/nixos-25.11#jq": {
+      "last_modified": "2026-01-13T16:58:14Z",
+      "resolved": "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a?lastModified=1768323494#jq"
+    },
     "github:NixOS/nixpkgs/nixos-25.11#yq-go": {
       "last_modified": "2026-01-13T16:58:14Z",
       "resolved": "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a?lastModified=1768323494#yq-go"
