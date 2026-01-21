@@ -1,6 +1,10 @@
 {
   "lockfile_version": "1",
   "packages": {
+    "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a": {
+      "last_modified": "1970-01-01T00:00:00Z",
+      "resolved": "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a"
+    },
     "github:NixOS/nixpkgs/nixos-25.11#curl": {
       "last_modified": "2026-01-13T16:58:14Z",
       "resolved": "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a?lastModified=1768323494#curl"
@@ -8,10 +12,6 @@
     "github:NixOS/nixpkgs/nixos-25.11#yq-go": {
       "last_modified": "2026-01-13T16:58:14Z",
       "resolved": "github:NixOS/nixpkgs/2c3e5ec5df46d3aeee2a1da0bfedd74e21f4bf3a?lastModified=1768323494#yq-go"
-    },
-    "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "last_modified": "2025-10-05T02:43:53Z",
-      "resolved": "github:NixOS/nixpkgs/d7f52a7a640bc54c7bb414cca603835bf8dd4b10?lastModified=1759632233"
     }
   }
 }

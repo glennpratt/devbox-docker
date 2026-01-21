@@ -93,11 +93,19 @@ if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
   fi
 
   # Configure Nix to use the local cache globally (affects devbox install and nix build)
-  # keeping upstream as fallback
-  CURRENT_SUBSTITUTERS=$(nix config show --extra-experimental-features 'nix-command flakes' | grep '^substituters =' | cut -d'=' -f2 | xargs)
-  export NIX_CONFIG="substituters = file://${NIX_BINARY_CACHE_DIR} ${CURRENT_SUBSTITUTERS}
+  if [[ "${DEBUG_OFFLINE:-0}" == "1" ]]; then
+    echo "==> DEBUG_OFFLINE: Blocking cache.nixos.org and using local cache only..."
+    echo "127.0.0.1 cache.nixos.org" >> /etc/hosts
+    export NIX_CONFIG="substituters = file://${NIX_BINARY_CACHE_DIR}
 require-sigs = false
 ${TRUSTED_KEYS}"
+  else
+    # Keep upstream as fallback
+    CURRENT_SUBSTITUTERS=$(nix config show --extra-experimental-features 'nix-command flakes' | grep '^substituters =' | cut -d'=' -f2 | xargs)
+    export NIX_CONFIG="substituters = file://${NIX_BINARY_CACHE_DIR} ${CURRENT_SUBSTITUTERS}
+require-sigs = false
+${TRUSTED_KEYS}"
+  fi
 fi
 
 if [[ "${VERBOSE:-0}" == "1" ]]; then
@@ -251,7 +259,15 @@ if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
     fi
 
     "${nix_copy[@]}" --to "$PUSH_URI" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}
-    "${nix_copy[@]}" --to "$PUSH_URI" /builder#packages.${NIX_SYSTEM}.cache
+
+    # Dynamically cache all build dependencies (derivation closure outputs)
+    echo "==> Caching full build closure (including build-time dependencies)..."
+    DRV_PATH=$(nix eval --raw --extra-experimental-features "nix-command flakes" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}.drvPath)
+
+    nix-store -qR "$DRV_PATH" \
+      | xargs nix-store -q --outputs \
+      | xargs -n 1000 sh -c 'for p; do [ -e "$p" ] && echo "$p"; done' _ \
+      | xargs -r "${nix_copy[@]}" --to "$PUSH_URI" || echo "Warning: Failed to copy some paths to cache"
 fi
 
 # Push if requested

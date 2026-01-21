@@ -8,6 +8,9 @@
     # nixpkgs can be overridden via --override-input to match devbox packages
     # Default follows devbox-gen's nixpkgs, but override for package alignment
     nixpkgs.follows = "devbox-gen/nixpkgs";
+
+    # Decoupled build toolchain (pinned for caching)
+    nixpkgs-build.url = "github:NixOS/nixpkgs/77ef7a29d276c6d8303aece3444d61118ef71ac2";
   };
 
   outputs =
@@ -15,6 +18,7 @@
       self,
       devbox-gen,
       nixpkgs,
+      nixpkgs-build,
       ...
     }:
     let
@@ -29,6 +33,7 @@
       # Use the (potentially overridden) nixpkgs for all base packages
       # This ensures glibc, bashInteractive, etc. match the devbox package deps
       pkgs = nixpkgs.legacyPackages.${system};
+      buildPkgs = nixpkgs-build.legacyPackages.${system};
 
       # Get the dynamic linker path for this system
       dynamicLinker = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";
@@ -37,10 +42,10 @@
       baseContents = [
         pkgs.bashInteractive
         pkgs.coreutils
-        pkgs.dockerTools.binSh
-        pkgs.dockerTools.caCertificates
-        pkgs.dockerTools.fakeNss
-        pkgs.dockerTools.usrBinEnv
+        buildPkgs.dockerTools.binSh
+        buildPkgs.dockerTools.caCertificates
+        buildPkgs.dockerTools.fakeNss
+        buildPkgs.dockerTools.usrBinEnv
         # Include all devbox packages from the generated flake
         # Note: these come from the same nixpkgs as pkgs (potentially overridden)
         # to maintain version consistency
@@ -111,6 +116,16 @@
             in
             if match == [ ] then "" else pkgs.lib.removePrefix "PATH_ADDITIONS=" (builtins.head match);
 
+          # Use user-provided image name if available from env, otherwise default
+          image_name =
+            let
+              matches = builtins.filter (v: pkgs.lib.hasPrefix "IMAGE_NAME=" v) envVars;
+            in
+            if matches != [] then
+              pkgs.lib.removePrefix "IMAGE_NAME=" (builtins.head matches)
+            else
+              "devbox-docker";
+
           finalEnv =
             [
               "USER=root"
@@ -128,8 +143,8 @@
                 [ ]
             );
         in
-        pkgs.dockerTools.buildLayeredImage {
-          name = "devbox-example";
+        buildPkgs.dockerTools.buildLayeredImage {
+          name = image_name;
           tag = "latest";
 
           # No base image - pure Nix for minimal size
@@ -155,13 +170,7 @@
         # Image with GitHub Actions compatibility
         ghaCompatImage = buildImage { includeGHA = true; };
 
-        # Manifest of all packages to be cached (captures full closure)
-        cache = pkgs.symlinkJoin {
-          name = "devbox-cache";
-          paths = baseContents ++ ghaContents ++
-                  (devbox-gen.devShells.${system}.default.buildInputs or []) ++
-                  (devbox-gen.devShells.${system}.default.nativeBuildInputs or []);
-        };
+
       };
 
       defaultPackage.${system} = self.packages.${system}.dockerImage;
