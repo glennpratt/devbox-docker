@@ -1,0 +1,28 @@
+# Minimal Determinate Nix Docker Image
+# This serves as the base image for building the devbox-docker builder with Nix.
+# Determinate Nix enables lazy trees and other advanced features.
+
+FROM debian:bookworm-slim
+
+# Install curl for the Determinate installer
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates xz-utils git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Determinate Nix
+# --init none: No systemd in containers
+# --no-confirm: Non-interactive install
+# --extra-conf: Disable sandbox for container compatibility
+RUN curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix \
+    | sh -s -- install linux \
+        --extra-conf "sandbox = false" \
+        --extra-conf "filter-syscalls = false" \
+        --extra-conf "experimental-features = nix-command fetch-closure flakes" \
+        --init none \
+        --no-confirm
+
+# Add Nix to PATH for subsequent commands
+ENV PATH="${PATH}:/nix/var/nix/profiles/default/bin"
+
+# Verify installation works
+RUN nix --version

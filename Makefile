@@ -1,16 +1,43 @@
-.PHONY: fmt build build-gha builder clean-cache
+.PHONY: fmt build build-gha builder base builder-nix clean-cache
 
 # For now, we're only interested in x86_64
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 
 # Use a fixed cache path under TMPDIR (occasionally cleared on most OS)
 NIX_CACHE_DIR ?= $(TMPDIR)devbox-nix-cache
+# Base image tarball location
+BASE_IMAGE_TAR ?= $(PWD)/devbox-nix-base.tar
+IMAGE_NAME ?= devbox-builder-nix
 
 fmt:
-	nixfmt flake.nix
+	nixfmt flake.nix builder/flake.nix
 
+# Original Dockerfile-based builder (legacy)
 builder:
 	docker buildx build --load --file Dockerfile -t devbox-builder .
+
+# Minimal Determinate Nix base image
+base:
+	docker buildx build --load --file Dockerfile.base -t devbox-nix-base .
+	docker save devbox-nix-base -o $(BASE_IMAGE_TAR)
+
+# Nix-built layered builder image (uses base image)
+# Runs nix build inside the base container since macOS cannot build Linux derivations directly
+builder-nix: base
+	docker run --rm \
+		-v $(PWD):/workspace \
+		-v $(NIX_CACHE_DIR):/root/.cache/nix \
+		-w /workspace \
+		devbox-nix-base \
+		sh -c 'BASE_IMAGE_TAR=/workspace/devbox-nix-base.tar nix build ./builder#builderImage \
+			--extra-experimental-features "nix-command flakes" \
+			--impure \
+			--print-build-logs \
+			&& cp -L result /workspace/builder-result.tar.gz'
+	gunzip -f builder-result.tar.gz
+	docker load -i builder-result.tar
+	docker tag devbox-docker-builder:latest devbox-builder-nix:latest
+	rm -f builder-result.tar
 
 $(NIX_CACHE_DIR)/cache-priv.key:
 	@mkdir -p $(NIX_CACHE_DIR)
