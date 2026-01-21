@@ -5,6 +5,7 @@
   },
   "packages": [
     "github:NixOS/nixpkgs/nixos-25.11#curl",
+    "github:NixOS/nixpkgs/nixos-25.11#jq",
     "github:NixOS/nixpkgs/nixos-25.11#yq-go"
   ],
   "shell": {

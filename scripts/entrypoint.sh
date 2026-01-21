@@ -117,62 +117,31 @@ fi
 echo "==> Installing devbox packages..."
 devbox install
 
-echo "==> Extracting environment variables from devbox init_hook..."
+echo "==> Extracting environment variables from devbox..."
+# Capture the full environment from devbox. We use --pure to avoid capturing
+# the builder's own environment, ensuring the target image is clean.
+# We also map the host-side project path to /project for the final image.
+PROJECT_ROOT=$(pwd)
+ENV_FULL=$(devbox run --pure printenv 2>/dev/null | sed "s|$PROJECT_ROOT|/project|g" || true)
 
-# Optimized "one-pass" extraction:
-# Prepend an environment dump to the init_hook to capture the "before" state,
-# then capture the "after" state from the final `devbox run printenv` output.
-ENV_VARS=""
-if [[ -f devbox.json ]] && jq -e '.shell.init_hook' devbox.json >/dev/null 2>&1; then
-  # Save original config
-  cp devbox.json devbox.json.orig
+if [[ -n "$ENV_FULL" ]]; then
+  # 1. Extract PATH and identify additions (everything except standard system paths)
+  # We exclude standard paths that the Docker image provides itself.
+  PATH_FULL=$(echo "$ENV_FULL" | grep '^PATH=' | cut -d= -f2-)
+  PATH_ADDITIONS=$(echo "$PATH_FULL" | tr ':' '\n' | \
+    grep -vE '^(/bin|/usr/bin|/usr/local/bin|/usr/sbin|/sbin|/root/.nix-profile/bin)$' | \
+    tr '\n' ':' | sed 's/:$//')
 
-  # Inject an environment dump at the start of the init_hook
-  # Handling both string and array formats for init_hook
-  jq '.shell.init_hook |= if type == "string" then "printenv > /tmp/env_before; " + . else ["printenv > /tmp/env_before"] + . end' devbox.json.orig > devbox.json
+  # 2. Extract other variables, filtering out system junk and devbox internal noise.
+  # We also filter out variables that are set explicitly in flake.nix (like USER).
+  ENV_VARS=$(echo "$ENV_FULL" | grep -v '^PATH=' | \
+    grep -vE '^(USER|HOME|PWD|TERM|SHELL|SHLVL|_|DEBIAN_FRONTEND|NIX_.*|DEVBOX_.*_HASH|__DEVBOX_.*|IMAGE_NAME)=' || true)
 
-  echo "    Running devbox printenv (single pass)..."
-  # Capture final env (after hook) while the hook itself dumps the before env
-  ENV_AFTER_HOOK=$(devbox run --pure printenv 2>/dev/null | sort)
-
-  if [[ -f /tmp/env_before ]]; then
-    ENV_BEFORE_HOOK=$(sort /tmp/env_before)
-    rm -f /tmp/env_before
-  else
-    # Fallback if the injection failed for some reason
-    ENV_BEFORE_HOOK=$(sort <(printenv))
-  fi
-
-  # Restore original config
-  cp devbox.json.orig devbox.json
-  rm -f devbox.json.orig
-
-  # Find variables that are new or changed (excluding PATH)
-  # Filter out internal devbox/nix noise
-  ENV_VARS=$(comm -13 <(echo "$ENV_BEFORE_HOOK") <(echo "$ENV_AFTER_HOOK") | \
-    grep -v '^PATH=' | \
-    grep -v '^__DEVBOX_' | \
-    grep -v '^DEVBOX_.*_HASH=' || true)
-
-  # Handle PATH specially - extract the new path components that were added
-  PATH_WITH=$(echo "$ENV_AFTER_HOOK" | grep '^PATH=' | cut -d= -f2-)
-  PATH_WITHOUT=$(echo "$ENV_BEFORE_HOOK" | grep '^PATH=' | cut -d= -f2-)
-
-  if [[ "$PATH_WITH" != "$PATH_WITHOUT" ]]; then
-    # Find path components in PATH_WITH that aren't in PATH_WITHOUT
-    NEW_PATH_COMPONENTS=$(comm -23 \
-      <(echo "$PATH_WITH" | tr ':' '\n' | sort) \
-      <(echo "$PATH_WITHOUT" | tr ':' '\n' | sort) | \
-      tr '\n' ':' | sed 's/:$//')
-
-    if [[ -n "$NEW_PATH_COMPONENTS" ]]; then
+  # Add PATH_ADDITIONS to the result if any were found
+  if [[ -n "$PATH_ADDITIONS" ]]; then
       ENV_VARS="${ENV_VARS}
-PATH_ADDITIONS=${NEW_PATH_COMPONENTS}"
-    fi
+PATH_ADDITIONS=${PATH_ADDITIONS}"
   fi
-
-  # Trim empty lines and whitespace
-  ENV_VARS=$(echo "$ENV_VARS" | grep -v '^$' | sed 's/[[:space:]]*$//' || true)
 fi
 
 if [[ -n "$ENV_VARS" ]]; then
