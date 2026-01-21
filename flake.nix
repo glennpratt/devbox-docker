@@ -116,6 +116,16 @@
             in
             if match == [ ] then "" else pkgs.lib.removePrefix "PATH_ADDITIONS=" (builtins.head match);
 
+          # Use user-provided image name if available from env, otherwise default
+          image_name =
+            let
+              matches = builtins.filter (v: pkgs.lib.hasPrefix "IMAGE_NAME=" v) envVars;
+            in
+            if matches != [] then
+              pkgs.lib.removePrefix "IMAGE_NAME=" (builtins.head matches)
+            else
+              "devbox-docker";
+
           finalEnv =
             [
               "USER=root"
