@@ -147,10 +147,12 @@ jobs:
 
       - name: Verify devbox packages work
         run: |
-          echo "==> Testing yq..."
-          yq --version
           echo "==> Testing curl..."
           curl --version | head -1
+          echo "==> Testing jq..."
+          jq --version
+          echo "==> Testing yq..."
+          yq --version
           echo "==> Testing ssh..."
           ssh -V
           echo "==> Testing ssh-agent..."
