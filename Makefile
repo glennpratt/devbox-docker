@@ -30,7 +30,8 @@ builder-nix: base
 		-v $(NIX_CACHE_DIR):/root/.cache/nix \
 		-w /workspace \
 		devbox-nix-base \
-		sh -c 'BASE_IMAGE_TAR=/workspace/devbox-nix-base.tar nix build ./builder#builderImage \
+		sh -c 'git config --global --add safe.directory /workspace && \
+			BASE_IMAGE_TAR=/workspace/devbox-nix-base.tar nix build ./builder#builderImage \
 			--extra-experimental-features "nix-command flakes" \
 			--impure \
 			--print-build-logs \
