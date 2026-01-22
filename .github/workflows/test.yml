@@ -35,17 +35,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build the builder image once - this is the ONLY builder build in this workflow
-      - name: Build builder image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          load: true
-          tags: devbox-nix-builder:test
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Build the builder image using Nix
+      - name: Build base image
+        run: make base
+
+      - name: Build builder image with Nix
+        run: |
+          make builder-nix IMAGE_NAME=devbox-nix-builder TAG=test
 
       # === Local Tests ===
       - name: Set up Nix store directories

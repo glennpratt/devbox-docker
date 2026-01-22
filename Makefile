@@ -8,6 +8,7 @@ NIX_CACHE_DIR ?= $(TMPDIR)devbox-nix-cache
 # Base image tarball location
 BASE_IMAGE_TAR ?= $(PWD)/devbox-nix-base.tar
 IMAGE_NAME ?= devbox-builder-nix
+TAG ?= latest
 
 fmt:
 	nixfmt flake.nix builder/flake.nix
@@ -36,7 +37,7 @@ builder-nix: base
 			&& cp -L result /workspace/builder-result.tar.gz'
 	gunzip -f builder-result.tar.gz
 	docker load -i builder-result.tar
-	docker tag devbox-docker-builder:latest devbox-builder-nix:latest
+	docker tag devbox-docker-builder:latest $(IMAGE_NAME):$(TAG)
 	rm -f builder-result.tar
 
 $(NIX_CACHE_DIR)/cache-priv.key:
