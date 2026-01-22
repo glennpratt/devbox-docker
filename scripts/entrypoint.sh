@@ -227,7 +227,8 @@ if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
         nix_copy+=(-v)
     fi
 
-    "${nix_copy[@]}" --to "$PUSH_URI" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}
+    # Skip caching the final image artifact (it's large and intended for registry push)
+    # "${nix_copy[@]}" --to "$PUSH_URI" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}
 
     # Dynamically cache all build dependencies (derivation closure outputs)
     echo "==> Caching full build closure (including build-time dependencies)..."
