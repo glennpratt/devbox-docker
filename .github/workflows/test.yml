@@ -63,7 +63,7 @@ jobs:
             v3-nix-store-uses-
 
       - name: Test building the example (uses docker pattern)
-        uses: docker://ghcr.io/${{ github.repository }}-builder:test
+        uses: docker://ghcr.io/glennpratt/devbox-docker-builder:test
         with:
           args: sh -c "cd example && /builder/entrypoint.sh --name test-app --tag test"
         env:
@@ -81,7 +81,7 @@ jobs:
 
       # === GHA Compatibility Test Image ===
       - name: Build GHA-compat example image (uses docker pattern)
-        uses: docker://ghcr.io/${{ github.repository }}-builder:test
+        uses: docker://ghcr.io/glennpratt/devbox-docker-builder:test
         with:
           args: sh -c "cd example && /builder/entrypoint.sh --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }} --github-actions"
         env:
@@ -118,7 +118,7 @@ jobs:
 
       - name: Build and push example image
         if: github.ref == 'refs/heads/main'
-        uses: docker://ghcr.io/${{ github.repository }}-builder:test
+        uses: docker://ghcr.io/glennpratt/devbox-docker-builder:test
         with:
           args: sh -c "cd example && /builder/entrypoint.sh --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} --tag latest"
         env:
