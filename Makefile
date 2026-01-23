@@ -21,6 +21,7 @@ builder:
 base:
 	docker buildx build --load --file Dockerfile.base -t devbox-nix-base .
 	docker save devbox-nix-base -o $(BASE_IMAGE_TAR)
+	chmod 644 $(BASE_IMAGE_TAR)
 
 # Nix-built layered builder image (uses base image)
 # Runs nix build inside the base container since macOS cannot build Linux derivations directly
