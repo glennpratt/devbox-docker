@@ -147,6 +147,29 @@ Example:
 
 These limitations significantly reduce the appeal of the `uses: docker://` pattern for this use case.
 
+### Could a Two-Job Pattern Work?
+
+**Idea**: Build and test with `docker run` in Job 1, push to registry with temp tag, then use `uses: docker://` in Job 2.
+
+**Problem**: The image reference in `uses: docker://` cannot use expressions, so you can't do:
+```yaml
+uses: docker://ghcr.io/user/builder:test-${{ github.sha }}  # ❌ FAILS
+```
+
+You'd have to hardcode a specific tag:
+```yaml
+uses: docker://ghcr.io/user/builder:latest  # ✅ Works, but not dynamic
+```
+
+**Verdict**: The two-job pattern doesn't solve the expression limitation. You'd still need to use `docker run` in Job 2 if you want dynamic tags.
+
+However, a two-job pattern with `docker run` in both jobs COULD be useful for:
+- Separating build/test from deployment
+- Using different cache strategies per job
+- Parallelizing work
+
+But it doesn't enable the `uses: docker://` pattern in any meaningful way.
+
 ## Application to Our Project
 
 ### Current Approach (`.github/workflows/test.yml`)
