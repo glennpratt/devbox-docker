@@ -1,0 +1,16 @@
+name: Research Docker Uses
+
+on:
+  workflow_dispatch:
+
+jobs:
+  research-mounts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inspect with uses: docker://
+        uses: docker://alpine:latest
+        with:
+          args: sh -c "echo '--- Env ---'; env; echo '--- Mounts ---'; mount; echo '--- PWD ---'; pwd; echo '--- LS /github ---'; ls -R /github; echo '--- Docker Socket ---'; ls -la /var/run/docker.sock || echo 'No socket'"
