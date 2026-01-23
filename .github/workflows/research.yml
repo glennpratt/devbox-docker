@@ -10,7 +10,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inspect with uses: docker://
+      - name: "Inspect with uses: docker://"
         uses: docker://alpine:latest
         with:
           args: sh -c "echo '--- Env ---'; env; echo '--- Mounts ---'; mount; echo '--- PWD ---'; pwd; echo '--- LS /github ---'; ls -R /github; echo '--- Docker Socket ---'; ls -la /var/run/docker.sock || echo 'No socket'"
+
+  research-job-container:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:latest
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inspect Job Container
+        run: |
+          echo "--- Env ---"
+          env
+          echo "--- Mounts ---"
+          mount
+          echo "--- PWD ---"
+          pwd
+          echo "--- LS / ---"
+          ls -F /
+          echo "--- Docker Socket ---"
+          ls -la /var/run/docker.sock || echo "No socket"
