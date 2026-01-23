@@ -100,6 +100,53 @@ runs:
   options: --privileged -v /custom:/mount
 ```
 
+## Critical Limitations Discovered
+
+During testing, we discovered two significant limitations of the `uses: docker://` pattern:
+
+### 1. No Expression Support in Image Reference
+
+**The `uses: docker://` field does NOT support GitHub Actions expressions.**
+
+This means you cannot use:
+```yaml
+uses: docker://ghcr.io/${{ github.repository }}-builder:test  # ❌ FAILS
+```
+
+You must use literal values:
+```yaml
+uses: docker://ghcr.io/glennpratt/devbox-docker-builder:test  # ✅ Works
+```
+
+**Impact**: This makes the pattern less reusable across forks or different repositories. You'd need to hardcode the repository name.
+
+### 2. Image Must Be in a Registry
+
+**The `uses: docker://` pattern ALWAYS tries to pull the image from a registry.**
+
+This means:
+- ❌ Cannot use locally-built images (e.g., `devbox-nix-builder:test`)
+- ✅ Must push to a registry first (e.g., `ghcr.io/user/image:tag`)
+
+**Impact**: You must add an extra step to push the builder image to GHCR before you can use it with `uses: docker://`. This adds time and complexity.
+
+Example:
+```yaml
+- name: Build builder
+  run: make builder-nix IMAGE_NAME=builder TAG=test
+
+- name: Push to registry for uses: docker://
+  run: |
+    docker tag builder:test ghcr.io/user/builder:test
+    docker push ghcr.io/user/builder:test
+
+- uses: docker://ghcr.io/user/builder:test  # Now it can pull it
+  with:
+    args: --name app --tag latest
+```
+
+These limitations significantly reduce the appeal of the `uses: docker://` pattern for this use case.
+
 ## Application to Our Project
 
 ### Current Approach (`.github/workflows/test.yml`)
@@ -206,40 +253,52 @@ For repos with the project in a subdirectory (like our `example/`), you'd need t
 | **Local testing** | ✅ Easy to test locally | ⚠️ Requires understanding GHA mounts |
 | **Maintenance** | ⚠️ More lines to maintain | ✅ Simpler |
 
-## Recommendation
+## Recommendation (Updated After Testing)
 
-**Both approaches are valid** - the choice depends on your priorities:
+**Use `docker run` for this project.** The `uses: docker://` pattern has too many limitations:
 
-### Use `docker run` if you value:
-1. **Explicit configuration**: Every mount and environment variable is visible in the workflow
-2. **Local reproducibility**: Easy to copy the exact command and run it locally
-3. **Flexibility**: Can mount caches outside workspace (e.g., `${{ runner.temp }}`)
-4. **Debugging**: Clear visibility into what's happening
+### Critical Blockers for `uses: docker://`:
 
-### Use `uses: docker://` if you value:
-1. **Simplicity**: Cleaner, more concise workflow syntax
-2. **Convention**: Following GitHub Actions patterns
-3. **Maintenance**: Fewer lines to maintain
-4. **Integration**: Better integration with GHA features (though both work fine)
+1. **Image must pre-exist in registry**: GitHub Actions pulls the image at job start, BEFORE any steps run. You cannot build and then use the image in the same job with `uses: docker://`.
 
-### For kpp-services specifically:
+2. **No expression support**: Cannot use `${{ github.repository }}` or other expressions in the image reference, making it less portable.
 
-The `uses: docker://` pattern would work well because:
-- ✅ The devbox project is at the repo root
-- ✅ No subdirectory navigation needed
-- ✅ Cleaner syntax for a frequently-used workflow
-- ✅ No custom Docker options needed
+3. **Hardcoded image names**: Must use literal values, reducing reusability across forks.
 
-**However**, consider:
-- ⚠️ Cache must be in workspace (counts toward disk quota)
-- ⚠️ Less obvious what's happening (implicit mounts)
-- ⚠️ Harder to debug if something goes wrong
+4. **Extra push step required**: Must push images to a registry even for testing, adding time and complexity.
 
-### Suggested approach:
+### When `uses: docker://` Makes Sense:
 
-**For production workflows (kpp-services)**: Consider migrating to `uses: docker://` for cleaner syntax, but test thoroughly first.
+The pattern works well for:
+- **Pre-published actions**: Images that are already in a registry (e.g., `docker://alpine:latest`)
+- **Stable tools**: Linters, formatters, or other tools that don't change per-build
+- **Simple workflows**: Where you're not building the image in the same workflow
 
-**For the test workflow in this repo**: Keep `docker run` since it demonstrates the flexibility and makes the mounts explicit for documentation purposes.
+### For This Project:
+
+**Test workflow**: Must use `docker run` because we build the builder image in the same workflow.
+
+**kpp-services**: Could potentially use `uses: docker://` IF:
+- You reference a pre-published builder image (e.g., `ghcr.io/glennpratt/devbox-docker-builder:latest`)
+- You're okay with hardcoding the repository name
+- The builder image is stable and doesn't change frequently
+
+However, even for kpp-services, `docker run` is probably better because:
+- ✅ More explicit and easier to debug
+- ✅ Can use `${{ runner.temp }}` for cache (off disk quota)
+- ✅ Portable across forks
+- ✅ Can easily test with different builder versions
+
+### Final Verdict:
+
+**Stick with `docker run`**. The perceived benefits of `uses: docker://` (cleaner syntax) are outweighed by:
+- Cannot build and use image in same workflow
+- No expression support
+- Less flexibility
+- Harder to debug
+- Must push to registry even for testing
+
+The explicit `docker run` approach is more powerful, more flexible, and actually clearer about what's happening.
 
 ## Test Results
 
