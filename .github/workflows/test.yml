@@ -44,28 +44,25 @@ jobs:
           make builder-nix IMAGE_NAME=devbox-nix-builder TAG=test
 
       # === Local Tests ===
-      - name: Set up Nix store directories
+      # Testing uses: docker:// pattern with workspace-based cache
+      - name: Set up Nix cache in workspace
         run: |
-          mkdir -p ${{ runner.temp }}/nix-cache
+          mkdir -p ${{ github.workspace }}/example/.nix-cache
 
       - name: Restore Nix store cache
         uses: actions/cache@v4
         with:
-          path: |
-            ${{ runner.temp }}/nix-cache
-          key: v2-nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          path: example/.nix-cache
+          key: v3-nix-store-uses-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
           restore-keys: |
-            v2-nix-store-test-
+            v3-nix-store-uses-
 
-      - name: Test building the example
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v ${{ github.workspace }}/example:/project \
-            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
-            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
-            devbox-nix-builder:test \
-            --name test-app --tag test
+      - name: Test building the example (uses docker pattern)
+        uses: docker://devbox-nix-builder:test
+        with:
+          args: sh -c "cd example && /builder/entrypoint.sh --name test-app --tag test"
+        env:
+          NIX_BINARY_CACHE_DIR: /github/workspace/example/.nix-cache/store
 
       - name: Verify built image
         run: |
@@ -78,15 +75,12 @@ jobs:
           docker images test-app:test --format "Image: {{.Repository}}:{{.Tag}} Size: {{.Size}}"
 
       # === GHA Compatibility Test Image ===
-      - name: Build GHA-compat example image
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v ${{ github.workspace }}/example:/project \
-            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
-            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
-            devbox-nix-builder:test \
-            --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }} --github-actions
+      - name: Build GHA-compat example image (uses docker pattern)
+        uses: docker://devbox-nix-builder:test
+        with:
+          args: sh -c "cd example && /builder/entrypoint.sh --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }} --github-actions"
+        env:
+          NIX_BINARY_CACHE_DIR: /github/workspace/example/.nix-cache/store
 
       - name: Push GHA-compat test image
         run: docker push ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
@@ -94,7 +88,7 @@ jobs:
       - name: Fix cache permissions
         if: always()
         run: |
-          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache || true
+          sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}/example/.nix-cache || true
 
       # === Conditional Publish (only on main, after tests pass) ===
       - name: Extract builder metadata
@@ -119,15 +113,15 @@ jobs:
 
       - name: Build and push example image
         if: github.ref == 'refs/heads/main'
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v ${{ github.workspace }}/example:/project \
-            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
-            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
-            devbox-nix-builder:test \
-            --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} --tag latest
-          docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest
+        uses: docker://devbox-nix-builder:test
+        with:
+          args: sh -c "cd example && /builder/entrypoint.sh --name ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }} --tag latest"
+        env:
+          NIX_BINARY_CACHE_DIR: /github/workspace/example/.nix-cache/store
+
+      - name: Push example image
+        if: github.ref == 'refs/heads/main'
+        run: docker push ${{ env.REGISTRY }}/${{ env.EXAMPLE_IMAGE }}:latest
 
   # Test running in the GHA-compat container
   test-in-container:
