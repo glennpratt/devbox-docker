@@ -1,0 +1,74 @@
+name: Test Uses Docker Pattern (Real World)
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BUILDER_IMAGE: ${{ github.repository }}-builder
+
+jobs:
+  # This simulates the kpp-services use case where the repo root is the devbox project
+  test-uses-pattern-root-project:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build base image
+        run: make base
+
+      - name: Build builder image with Nix
+        run: make builder-nix IMAGE_NAME=devbox-nix-builder TAG=test
+
+      # Move example to root to simulate kpp-services structure
+      - name: Simulate root-level devbox project
+        run: |
+          cp example/devbox.json .
+          cp example/devbox.lock .
+          mkdir -p .nix-cache
+
+      - name: Restore Nix store cache
+        uses: actions/cache@v4
+        with:
+          path: .nix-cache
+          key: v3-nix-store-uses-${{ hashFiles('devbox.json', 'devbox.lock') }}
+          restore-keys: |
+            v3-nix-store-uses-
+
+      # Test using 'uses: docker://' pattern
+      # This is how kpp-services would use it
+      - name: Build with uses docker pattern
+        uses: docker://devbox-nix-builder:test
+        with:
+          args: --name test-app --tag test --github-actions
+        env:
+          NIX_BINARY_CACHE_DIR: /github/workspace/.nix-cache/store
+
+      - name: Verify built image
+        run: |
+          docker images test-app:test
+          docker run --rm test-app:test yq --version
+          docker run --rm test-app:test curl --version | head -1
+
+      - name: Show image size
+        run: |
+          docker images test-app:test --format "Image: {{.Repository}}:{{.Tag}} Size: {{.Size}}"
+
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) .nix-cache || true
