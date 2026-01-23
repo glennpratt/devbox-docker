@@ -43,7 +43,7 @@ jobs:
         run: |
           make builder-nix IMAGE_NAME=devbox-nix-builder TAG=test
 
-      - name: Push builder to registry for uses: docker:// testing
+      - name: "Push builder to registry for uses: docker:// testing"
         run: |
           docker tag devbox-nix-builder:test ${{ env.REGISTRY }}/${{ env.BUILDER_IMAGE }}:test
           docker push ${{ env.REGISTRY }}/${{ env.BUILDER_IMAGE }}:test
