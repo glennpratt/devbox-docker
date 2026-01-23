@@ -1,0 +1,148 @@
+name: Test Two-Job Pattern
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BUILDER_IMAGE: ${{ github.repository }}-builder
+  TEMP_TAG: test-${{ github.sha }}
+
+jobs:
+  # Job 1: Build and test with docker run, then publish temp image
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      builder_image: ${{ steps.publish.outputs.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build base image
+        run: make base
+
+      - name: Build builder image with Nix
+        run: make builder-nix IMAGE_NAME=devbox-nix-builder TAG=test
+
+      # Test with docker run (ephemeral, using local image)
+      - name: Set up Nix cache
+        run: mkdir -p ${{ runner.temp }}/nix-cache
+
+      - name: Restore Nix store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/nix-cache
+          key: v2-nix-store-test-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          restore-keys: |
+            v2-nix-store-test-
+
+      - name: Test building the example (docker run)
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v ${{ github.workspace }}/example:/project \
+            -v ${{ runner.temp }}/nix-cache:/root/.cache/nix \
+            -e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
+            devbox-nix-builder:test \
+            --name test-app --tag test
+
+      - name: Verify built image
+        run: |
+          docker images test-app:test
+          docker run --rm test-app:test yq --version
+
+      # After tests pass, publish with temp tag for next job
+      - name: Publish builder with temp tag
+        id: publish
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.BUILDER_IMAGE }}:${{ env.TEMP_TAG }}"
+          docker tag devbox-nix-builder:test "$IMAGE"
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) ${{ runner.temp }}/nix-cache || true
+
+  # Job 2: Use the published image with uses: docker:// pattern
+  test-uses-pattern:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Nix cache in workspace
+        run: mkdir -p .nix-cache
+
+      - name: Restore Nix store cache
+        uses: actions/cache@v4
+        with:
+          path: .nix-cache
+          key: v3-nix-store-uses-${{ hashFiles('example/devbox.json', 'example/devbox.lock') }}
+          restore-keys: |
+            v3-nix-store-uses-
+
+      # Now we can use uses: docker:// because the image exists in the registry
+      - name: Build GHA-compat image (uses docker pattern)
+        uses: docker://ghcr.io/glennpratt/devbox-docker-builder:test-${{ github.sha }}
+        with:
+          args: sh -c "cd example && /builder/entrypoint.sh --name ghcr.io/${{ github.repository }}/gha-compat-test --tag ${{ github.sha }} --github-actions"
+        env:
+          NIX_BINARY_CACHE_DIR: /github/workspace/.nix-cache/store
+
+      - name: Verify GHA-compat image
+        run: |
+          docker images ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
+
+      - name: Push GHA-compat test image
+        run: docker push ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
+
+      - name: Fix cache permissions
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) .nix-cache || true
+
+  # Job 3: Test in the GHA-compat container
+  test-in-container:
+    needs: test-uses-pattern
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/gha-compat-test:${{ github.sha }}
+    steps:
+      - name: Checkout (tests GHA Node.js compatibility)
+        uses: actions/checkout@v4
+
+      - name: Verify devbox packages work
+        run: |
+          echo "==> Testing curl..."
+          curl --version | head -1
+          echo "==> Testing jq..."
+          jq --version
+          echo "==> Testing yq..."
+          yq --version
+          echo "==> SUCCESS: Container is GHA-compatible!"
