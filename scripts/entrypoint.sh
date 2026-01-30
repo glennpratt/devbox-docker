@@ -8,13 +8,23 @@ PUSH=""
 REGISTRY=""
 GITHUB_ACTIONS=""
 
+# Set a writable HOME directory to prevent Nix from falling back to / or /homeless-shelter
+# by default, which can trigger purity checks.
+export HOME=/tmp
+
 # Fix for Nix purity error: "/homeless-shelter exists"
-# This happens when sandboxing is disabled and a previous command (like devbox install)
-# left the directory behind.
-if [[ -d /homeless-shelter ]]; then
-  echo "==> Cleaning up /homeless-shelter to ensure Nix build purity..."
-  rm -rf /homeless-shelter
-fi
+# This happens when sandboxing is disabled and a previous command
+# left the directory behind. We define a function and call it before
+# every Nix-related command because devbox commands often recreation it.
+cleanup_homeless_shelter() {
+  if [[ -d /homeless-shelter ]]; then
+    echo "==> Cleaning up /homeless-shelter to ensure Nix build purity..."
+    rm -rf /homeless-shelter
+  fi
+}
+
+# Initial cleanup
+cleanup_homeless_shelter
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -122,8 +132,10 @@ if [[ "${VERBOSE:-0}" == "1" ]]; then
     export DEVBOX_DEBUG=1
 fi
 
+cleanup_homeless_shelter
 echo "==> Installing devbox packages..."
 devbox install
+cleanup_homeless_shelter
 
 echo "==> Extracting environment variables from devbox..."
 # Capture the full environment from devbox. We use --pure to avoid capturing
@@ -200,6 +212,7 @@ else
 fi
 
 # Build command - requires --impure to read the env vars file
+cleanup_homeless_shelter
 nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
   --extra-experimental-features 'nix-command flakes fetch-closure' \
   "${NIXPKGS_OVERRIDE[@]}" \
@@ -240,6 +253,7 @@ if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
 
     # Dynamically cache all build dependencies (derivation closure outputs)
     echo "==> Caching full build closure (including build-time dependencies)..."
+    cleanup_homeless_shelter
     DRV_PATH=$(nix eval --raw --extra-experimental-features "nix-command flakes" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}.drvPath)
 
     nix-store -qR "$DRV_PATH" \
