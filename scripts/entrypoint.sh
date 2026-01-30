@@ -8,6 +8,14 @@ PUSH=""
 REGISTRY=""
 GITHUB_ACTIONS=""
 
+# Fix for Nix purity error: "/homeless-shelter exists"
+# This happens when sandboxing is disabled and a previous command (like devbox install)
+# left the directory behind.
+if [[ -d /homeless-shelter ]]; then
+  echo "==> Cleaning up /homeless-shelter to ensure Nix build purity..."
+  rm -rf /homeless-shelter
+fi
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
