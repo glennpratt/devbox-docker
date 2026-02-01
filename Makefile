@@ -62,10 +62,17 @@ build: builder $(NIX_CACHE_DIR)/cache-priv.key
 build-gha: builder $(NIX_CACHE_DIR)/cache-priv.key
 	@mkdir -p $(NIX_CACHE_DIR)
 	docker run --rm \
+		--read-only \
+		--tmpfs /tmp:rw,exec,mode=1777 \
+		--tmpfs /run \
+		--tmpfs /var/tmp \
+		-v /nix/store \
+		-v /nix/var \
+		-v /root \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(PWD)/example:/project \
 		-v $(NIX_CACHE_DIR):/root/.cache/nix \
-		-e NIX_BINARY_CACHE_DIR=/root/.cache/nix/binary-cache \
+		-e NIX_BINARY_CACHE_DIR=/root/.cache/nix/store \
 		devbox-builder --name devbox-docker-example --tag latest --github-actions
 
 clean-cache:

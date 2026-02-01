@@ -15,6 +15,13 @@ Building Docker images with devbox directly creates one massive layer (3GB+ in s
 ```bash
 # Build your devbox project into a Docker image
 docker run --rm \
+  --read-only \
+  --tmpfs /tmp:rw,exec,mode=1777 \
+  --tmpfs /run \
+  --tmpfs /var/tmp \
+  -v /nix/store \
+  -v /nix/var \
+  -v /root \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/project \
   devbox-nix-builder:latest --name myapp --tag v1.0
@@ -27,6 +34,13 @@ docker run --rm myapp:v1.0
 
 ```bash
 docker run --rm \
+  --read-only \
+  --tmpfs /tmp:rw,exec,mode=1777 \
+  --tmpfs /run \
+  --tmpfs /var/tmp \
+  -v /nix/store \
+  -v /nix/var \
+  -v /root \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/project \
   -v devbox-nix-cache:/root/.cache/nix \
@@ -93,6 +107,13 @@ By default, images are built minimal. To use the image as a `container:` in GitH
 
 ```bash
 docker run --rm \
+  --read-only \
+  --tmpfs /tmp:rw,exec,mode=1777 \
+  --tmpfs /run \
+  --tmpfs /var/tmp \
+  -v /nix/store \
+  -v /nix/var \
+  -v /root \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/project \
   devbox-nix-builder:latest --name myapp --github-actions
@@ -131,6 +152,13 @@ docker buildx build --load -t devbox-nix-builder:latest .
 
 # Test with the example
 docker run --rm \
+  --read-only \
+  --tmpfs /tmp:rw,exec,mode=1777 \
+  --tmpfs /run \
+  --tmpfs /var/tmp \
+  -v /nix/store \
+  -v /nix/var \
+  -v /root \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd)/example:/project \
   devbox-nix-builder:latest --name example-app
@@ -194,6 +222,13 @@ docker volume create devbox-nix-cache
 
 # Use in builds
 docker run --rm \
+  --read-only \
+  --tmpfs /tmp:rw,exec,mode=1777 \
+  --tmpfs /run \
+  --tmpfs /var/tmp \
+  -v /nix/store \
+  -v /nix/var \
+  -v /root \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/project \
   -v devbox-nix-cache:/root/.cache/nix \
@@ -258,7 +293,15 @@ jobs:
       
       - name: Build with devbox-nix-builder
         run: |
+        run: |
           docker run --rm \
+            --read-only \
+            --tmpfs /tmp:rw,exec,mode=1777 \
+            --tmpfs /run \
+            --tmpfs /var \
+            -v /nix/store \
+            -v /nix/var \
+            -v /root \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v ${{ github.workspace }}:/project \
             -v devbox-nix-cache:/root/.cache/nix \

@@ -69,13 +69,37 @@ Options:
 
 Examples:
   # Build with default name
-  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v \$(pwd):/project devbox-nix-builder
+  docker run --rm \
+    --read-only \
+    --tmpfs /tmp:rw,exec,mode=1777 \
+    --tmpfs /run \
+    --tmpfs /var/tmp \
+    -v /nix/store -v /nix/var -v /root \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v \$(pwd):/project \
+    devbox-nix-builder
 
   # Build with custom name and tag
-  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v \$(pwd):/project devbox-nix-builder --name myapp --tag v1.0
+  docker run --rm \
+    --read-only \
+    --tmpfs /tmp:rw,exec,mode=1777 \
+    --tmpfs /run \
+    --tmpfs /var/tmp \
+    -v /nix/store -v /nix/var -v /root \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v \$(pwd):/project \
+    devbox-nix-builder --name myapp --tag v1.0
 
   # Build and push to registry
-  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v \$(pwd):/project devbox-nix-builder --name myapp --push --registry ghcr.io/myuser
+  docker run --rm \
+    --read-only \
+    --tmpfs /tmp:rw,exec,mode=1777 \
+    --tmpfs /run \
+    --tmpfs /var/tmp \
+    -v /nix/store -v /nix/var -v /root \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v \$(pwd):/project \
+    devbox-nix-builder --name myapp --push --registry ghcr.io/myuser
 
 For faster builds, mount a cache volume:
   docker run --rm \\
