@@ -120,6 +120,15 @@ done
 # Detect system architecture from devbox flake
 NIX_SYSTEM="x86_64-linux"
 
+# Prepare writable builder directory (since root is read-only)
+# We copy the builder flake to /tmp so Nix can write flake.lock
+if [[ -d "/builder" ]]; then
+  echo "==> Preparing writable builder context..."
+  rm -rf /tmp/builder # Clean up potential previous runs
+  cp -r /builder /tmp/builder
+  chmod -R +w /tmp/builder
+fi
+
 # Fix for git ownership issues in Nix cache (common in GHA with UID mismatches)
 git config --global --add safe.directory '*'
 
@@ -237,7 +246,7 @@ fi
 
 # Build command - requires --impure to read the env vars file
 cleanup_homeless_shelter
-nix build /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
+nix build /tmp/builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT} \
   --extra-experimental-features 'nix-command flakes fetch-closure' \
   "${NIXPKGS_OVERRIDE[@]}" \
   --impure \
@@ -278,7 +287,7 @@ if [[ -n "${NIX_BINARY_CACHE_DIR:-}" ]]; then
     # Dynamically cache all build dependencies (derivation closure outputs)
     echo "==> Caching full build closure (including build-time dependencies)..."
     cleanup_homeless_shelter
-    DRV_PATH=$(nix eval --raw --extra-experimental-features "nix-command flakes" /builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}.drvPath)
+    DRV_PATH=$(nix eval --raw --extra-experimental-features "nix-command flakes" /tmp/builder#packages.${NIX_SYSTEM}.${IMAGE_OUTPUT}.drvPath)
 
     nix-store -qR "$DRV_PATH" \
       | xargs nix-store -q --outputs \
